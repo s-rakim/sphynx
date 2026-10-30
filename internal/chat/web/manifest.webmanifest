@@ -1,0 +1,12 @@
+{
+  "name": "Sphynx Chat",
+  "short_name": "Sphynx Chat",
+  "description": "End-to-end encrypted chat, calls and file sharing between the devices on your Sphynx network",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111b21",
+  "theme_color": "#008069",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

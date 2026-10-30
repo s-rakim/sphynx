@@ -1,0 +1,16 @@
+{
+  "name": "sphynx-chat-tests",
+  "private": true,
+  "description": "End-to-end contract tests for Sphynx Chat: they drive the Go server (dev mode) with the web app's own crypto code",
+  "type": "module",
+  "license": "BSD-3-Clause",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test --test-timeout=60000 *.test.js"
+  },
+  "devDependencies": {
+    "ws": "8.21.3"
+  }
+}
