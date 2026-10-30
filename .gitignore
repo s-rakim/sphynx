@@ -1,0 +1,6 @@
+/sphynx
+/dist/
+.env
+*.test
+*.out
+node_modules/
