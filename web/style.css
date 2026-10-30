@@ -374,6 +374,9 @@ td.actions { text-align: right; white-space: nowrap; }
 .list-plain { list-style: none; margin: 0; padding: 0; }
 .list-plain li { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
 .list-plain li:last-child { border-bottom: 0; }
+/* Long text wraps instead of pushing the controls off a phone screen. */
+.list-plain li > :first-child { min-width: 0; overflow-wrap: anywhere; }
+.list-plain li > :not(:first-child) { flex: none; }
 
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
