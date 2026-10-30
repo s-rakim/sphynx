@@ -51,6 +51,7 @@ const ICONS = {
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6L6 18",
   refresh: "M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7",
+  radio: "M12 13v8M8 21h8M8.5 9.5a5 5 0 0 1 7 0M5.6 6.6a9 9 0 0 1 12.8 0M12 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z",
 };
 
 function icon(name) {
@@ -341,6 +342,7 @@ const NAV = [
   ["wol", "Wake-on-LAN", "wol"],
   ["chat", "Chat", "chat"],
   ["link", "Sphynx Link", "link"],
+  ["radio", "Radio", "radio"],
   ["shares", "Public shares", "share"],
   null,
   ["settings", "Settings", "settings"],
@@ -1354,6 +1356,205 @@ PAGES.link = async (el) => {
       allowRows, h("button", { class: "small", onclick: () => allowRows.append(allowRow({})) }, "Add computer"),
       h("div", { class: "mt" }), field("Relay map URL (advanced)", derp, "Tailcat uses its free relays to set up connections; traffic stays end-to-end encrypted."))));
   el.replaceChildren(...parts);
+};
+
+// ---------- Radio ----------
+
+const RADIO_LINKS = [["meshtastic", "Meshtastic (LoRa)"], ["aprs", "APRS (amateur radio)"]];
+const radioLinkName = (l) => (l === "aprs" ? "APRS" : "Meshtastic");
+
+PAGES.radio = async (el) => {
+  const [R, devices] = await Promise.all([api("GET", "/api/radio"), api("GET", "/api/nodes").catch(() => [])]);
+  const s = R.settings;
+
+  const enabled = toggleRow("Turn on radio mode", "Sphynx listens on the radios below and answers your radio contacts.", s.enabled);
+  const meshOn = checkbox("Use a Meshtastic radio", "LoRa radios for about US$30 to 100. No licence needed.", s.meshtastic.enabled);
+  const meshAddr = textInput(s.meshtastic.address, { placeholder: "192.168.1.50 or /dev/ttyUSB0" });
+  const aprsOn = checkbox("Use APRS", "Amateur packet radio. Needs an amateur radio licence.", s.aprs.enabled);
+  const call = textInput(s.aprs.call, { placeholder: "5Z4ABC-10", autocapitalize: "characters", spellcheck: "false" });
+  const pass = h("input", { type: "password", autocomplete: "new-password", inputmode: "numeric", placeholder: R.passcodeSet ? "Saved. Leave empty to keep it." : "From your APRS-IS account" });
+  const clearPass = R.passcodeSet ? checkbox("Forget the saved passcode", "Without one, APRS-IS only lets Sphynx listen.", false) : null;
+  const server = textInput(s.aprs.server, { placeholder: "rotate.aprs2.net:14580" });
+  const kiss = textInput(s.aprs.kiss, { placeholder: "192.168.1.60:8001" });
+  const path = textInput((s.aprs.path || []).join(", "), { placeholder: "WIDE1-1, WIDE2-1" });
+
+  // Radio contacts, edited in place and saved with the page.
+  const contactRows = h("div");
+  const contactKeys = () => new Set([...contactRows.children].map((r) => r.get()).map((c) => c.link + ":" + c.address.toLowerCase()));
+  function contactRow(c) {
+    const name = textInput(c.name, { placeholder: "My handheld" });
+    const link = select(RADIO_LINKS, c.link || "meshtastic");
+    const addr = textInput(c.address, { class: "mono", spellcheck: "false" });
+    const addrField = field("Node id", addr);
+    const hint = () => {
+      const aprs = link.value === "aprs";
+      addr.placeholder = aprs ? "5Z4ABC-7" : "!a1b2c3d4";
+      addrField.querySelector("label").textContent = aprs ? "Callsign" : "Node id";
+    };
+    link.addEventListener("change", hint);
+    hint();
+    const cmds = checkbox("Commands", "status, ping and wake", c.commands ?? true);
+    const chat = checkbox("Chat", "A contact in Sphynx Chat", c.chat ?? true);
+    const row = h("div", { class: "radio-contact" },
+      h("div", { class: "row" }, field("Name", name), field("Radio", link), addrField),
+      h("div", { class: "row middle" }, cmds, chat, h("div", { class: "spacer" }),
+        c.id ? h("button", { class: "small", title: "Send it a test message", onclick: async (e) => {
+          await run(e.currentTarget, () => api("POST", "/api/radio/test", { contactId: c.id }), "Sending a test message. The log shows how it went.");
+          setTimeout(() => refresh().catch(() => {}), 2000);
+        } }, "Test") : null,
+        h("button", { class: "small danger", onclick: () => { row.remove(); drawContactsEmpty(); } }, "Remove")));
+    row.get = () => ({ id: c.id || "", name: name.value.trim(), link: link.value, address: addr.value.trim(), commands: cmds.input.checked, chat: chat.input.checked });
+    return row;
+  }
+  const contactsEmpty = h("p", { class: "muted" }, "No radio contacts yet. Only stations listed here can use Sphynx.");
+  function drawContactsEmpty() { contactsEmpty.classList.toggle("hidden", contactRows.children.length > 0); }
+  function addContact(c, scroll) {
+    contactRows.append(contactRow(c));
+    drawContactsEmpty();
+    if (scroll) {
+      contactRows.lastChild.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast("Added to your radio contacts. Save to keep it.");
+    }
+  }
+  for (const c of s.contacts || []) addContact(c);
+  drawContactsEmpty();
+
+  // Where chat messages from radio contacts go.
+  const people = devices.filter((d) => !d.helper || d.home);
+  const deliver = people.map((d) => {
+    const cb = checkbox(devName(d) + (d.home ? " (Sphynx home, this PC)" : ""), null, (s.deliverTo || []).includes(d.id));
+    cb.nodeId = d.id;
+    return cb;
+  });
+
+  const save = h("button", { class: "primary", onclick: async (e) => {
+    await run(e.currentTarget, () => api("PUT", "/api/radio", {
+      enabled: enabled.input.checked,
+      meshtastic: { enabled: meshOn.input.checked, address: meshAddr.value.trim() },
+      aprs: { enabled: aprsOn.input.checked, call: call.value.trim(), server: server.value.trim(), kiss: kiss.value.trim(), path: path.value.split(/[\s,]+/).filter(Boolean) },
+      contacts: [...contactRows.children].map((r) => r.get()).filter((c) => c.name || c.address),
+      deliverTo: deliver.filter((cb) => cb.input.checked).map((cb) => cb.nodeId),
+      passcode: pass.value.trim(),
+      clearPasscode: !!clearPass?.input.checked,
+    }), "Saved");
+    render();
+  } }, "Save");
+
+  // Parts that refresh while the page is open.
+  const linksBox = h("div");
+  const nodesBox = h("div");
+  const heardBox = h("div");
+  const logBox = h("div");
+  function draw(R) {
+    linksBox.replaceChildren(!s.enabled ? h("p", { class: "muted small" }, "Radio mode is off.")
+      : !R.links.length ? h("p", { class: "muted small" }, "No radio turned on.")
+      : h("ul", { class: "list-plain" }, R.links.map((l) => h("li", null,
+        h("div", null, h("div", { class: "primary-text", text: l.name }), h("div", { class: "secondary-text" }, l.error || l.detail || "")),
+        l.connected ? badge("Connected", "ok") : l.error ? badge("Not connected", "bad") : badge("Connecting", "warn")))));
+
+    const keys = contactKeys();
+    const nodes = R.nodes.filter((n) => !keys.has("meshtastic:" + n.id)).sort((a, b) => (b.lastHeard || "").localeCompare(a.lastHeard || "")).slice(0, 30);
+    nodesBox.replaceChildren(nodes.length ? h("ul", { class: "list-plain" }, nodes.map((n) => h("li", null,
+      h("div", null, h("div", { class: "primary-text" }, n.longName || n.shortName || n.id, " ", h("span", { class: "mono faint small", text: n.id })),
+        h("div", { class: "secondary-text" }, [n.lastHeard ? "heard " + timeAgo(n.lastHeard) : "not heard yet", n.direct ? "directly" + (n.snr != null ? `, SNR ${n.snr.toFixed(1)} dB` : "") : null].filter(Boolean).join(", "))),
+      h("button", { class: "small", onclick: () => addContact({ name: n.longName || n.shortName || n.id, link: "meshtastic", address: n.id }, true) }, "Add as contact"))))
+      : h("p", { class: "muted small" }, R.links.some((l) => l.name.startsWith("Meshtastic") && l.connected) ? "None besides your contacts." : "Shown once the Meshtastic radio is connected."));
+
+    const heard = R.heard.filter((m) => !keys.has(m.link + ":" + m.from.toLowerCase()));
+    heardBox.replaceChildren(heard.length ? h("ul", { class: "list-plain" }, heard.map((m) => h("li", null,
+      h("div", null, h("div", { class: "primary-text" }, m.name || m.from, " ", h("span", { class: "mono faint small", text: m.name ? m.from : "" }), " ", badge(radioLinkName(m.link))),
+        h("div", { class: "secondary-text" }, `"${m.text}", ${timeAgo(m.at)}`)),
+      h("button", { class: "small", onclick: () => addContact({ name: m.name || m.from, link: m.link, address: m.from }, true) }, "Add as contact"))))
+      : h("p", { class: "muted small" }, "Nobody else has messaged Sphynx."));
+
+    logBox.replaceChildren(R.log.length ? h("ul", { class: "list-plain" }, R.log.map((e) => h("li", null,
+      h("div", null,
+        h("div", { class: "primary-text" }, e.out ? "To " : "From ", e.station, " ", badge(radioLinkName(e.link)), " ", h("span", { class: "mono small", text: e.text })),
+        e.result ? h("div", { class: "secondary-text" + (e.result.startsWith("not") ? " bad-text" : "") }, e.result) : null),
+      h("div", { class: "faint small nowrap" }, timeAgo(e.at)))))
+      : h("p", { class: "muted small" }, "No radio messages yet."));
+  }
+  async function refresh() { draw(await api("GET", "/api/radio")); }
+  draw(R);
+
+  async function showCode() {
+    const c = await api("POST", "/api/radio/code");
+    await modal({
+      title: "Scan this with an authenticator app",
+      body: h("div", null,
+        h("p", null, "Use any authenticator app, like Google Authenticator, Microsoft Authenticator, Aegis or 2FAS. It then shows a new 6-digit code for Sphynx every 30 seconds."),
+        h("div", { class: "qr-wrap" }, h("img", { class: "qr", src: c.qr, alt: "QR code for the authenticator app" })),
+        h("p", { class: "small muted" }, "Can't scan it? Type this key into the app instead (time-based):"),
+        codebox(c.secret),
+        notice("warn", "Sphynx shows this only once. Anyone with it can make wake codes.")),
+      buttons: [{ text: "Done", class: "primary", value: true }],
+    });
+    render();
+  }
+
+  const parts = [pageHead("Radio", "Reach Sphynx with short text messages over long-range radio where there is no internet at all. A radio at home passes them on: commands to check on things and wake computers, and chats with your devices in Sphynx Chat. Radio carries text only, not internet traffic.", save)];
+  if (!R.chatOn) parts.push(notice("warn", "Sphynx Chat is off, so radio contacts can only use commands. Turn it on under ", h("a", { href: "#/chat" }, "Chat"), "."));
+
+  parts.push(h("div", { class: "grid two" },
+    card("Radio mode", null, enabled, h("div", { class: "mt" }), linksBox),
+    card("What you need", null, h("ol", { class: "steps" },
+      h("li", null, h("strong", null, "A radio at home"), " that this PC can reach: a Meshtastic radio on your Wi-Fi or plugged in by USB, or an APRS radio with a TNC such as Dire Wolf. APRS can also use the internet's APRS-IS network."),
+      h("li", null, h("strong", null, "A radio with you"), ": a Meshtastic radio paired with the Meshtastic app on your phone, or an APRS radio that sends messages."),
+      h("li", null, "Add your radio below as a contact, then send ", h("code", null, "help"), " to Sphynx from it.")))));
+
+  parts.push(h("div", { class: "grid two" },
+    card("Meshtastic (LoRa)", "Each radio reaches roughly 2 to 15 km, more from high ground, and further when other Meshtastic radios in between pass messages on.",
+      meshOn,
+      field("The radio at home", meshAddr, h("span", null, "Its IP address on your network (turn on Wi-Fi or Ethernet in the radio's Network settings), or a USB port like ", h("code", null, "/dev/ttyUSB0"), " when Sphynx runs on Linux. Give Sphynx a radio of its own: a phone connected to the same radio would take the messages first.")),
+      h("p", { class: "small muted" }, "From your radio, send a direct message to the home radio in the Meshtastic app.")),
+    card("APRS (amateur radio)", "APRS reaches far: through digipeaters, and internet gateways (iGates) that pass messages to APRS-IS, a message sent from hundreds or thousands of kilometres away can reach Sphynx.",
+      aprsOn,
+      notice("warn", h("strong", null, "APRS messages are public. "), "Anyone can read them, for example on aprs.fi, and callsigns can be faked, so wake commands always need a code. You need an amateur radio licence to send."),
+      h("div", { class: "mt" }),
+      h("div", { class: "row" }, field("Sphynx's callsign", call, "Yours, with an SSID of its own, like -10."), field("APRS-IS passcode", pass, "Lets Sphynx send through APRS-IS. Without it Sphynx only listens there.")),
+      clearPass,
+      field("APRS-IS server", server, "Leave empty to use only the radio at home."),
+      h("div", { class: "row" }, field("KISS TNC at home (optional)", kiss, "host:port of Dire Wolf or a KISS TNC, for sending and hearing over your own radio."), field("Digipeater path", path)),
+      h("p", { class: "small muted" }, "From your radio, send an APRS message to Sphynx's callsign."))));
+
+  parts.push(card("Radio contacts", "The stations that may use Sphynx. Messages from anyone else are ignored and listed under Recently heard.",
+    contactsEmpty, contactRows,
+    h("div", { class: "inline mt" }, h("button", { class: "small", onclick: () => addContact({ link: "meshtastic", commands: true, chat: true }) }, icon("add"), "Add contact"), h("span", { class: "muted small" }, "Save the page to keep changes."))));
+
+  parts.push(h("div", { class: "grid two" },
+    card("Meshtastic radios in range", "Radios the home radio knows about.", nodesBox),
+    card("Recently heard", "Stations that messaged Sphynx but aren't your contacts.", heardBox)));
+
+  parts.push(h("div", { class: "grid two" },
+    card("Wake computers over the radio", null,
+      h("p", null, "Send ", h("code", null, "wake <computer> <code>"), ", with the 6-digit code your authenticator app shows for Sphynx. Each code works once; after 5 wrong codes, waking stops for an hour."),
+      R.codeSet
+        ? h("div", { class: "inline" }, badge("Wake codes on", "ok"),
+          h("button", { class: "small", onclick: async (e) => {
+            if (!(await confirmAsk("Replace the wake codes?", "Codes from the old entry in your authenticator app stop working.", "Replace"))) return;
+            await run(e.currentTarget, showCode);
+          } }, "Replace"),
+          h("button", { class: "small danger", onclick: async (e) => {
+            if (!(await confirmAsk("Turn off wake codes?", "Nobody can wake computers over the radio until you set them up again.", "Turn off", true))) return;
+            await run(e.currentTarget, () => api("DELETE", "/api/radio/code"), "Wake codes off");
+            render();
+          } }, "Turn off"))
+        : h("div", null, h("p", { class: "muted small" }, "Off: nobody can wake computers over the radio."), h("button", { class: "primary", onclick: (e) => run(e.currentTarget, showCode) }, "Set up wake codes")),
+      h("p", { class: "small muted mt" }, R.wakeTargets.length ? "Computers: " + R.wakeTargets.join(", ") + "." : h("span", null, "Add the computers to wake on the ", h("a", { href: "#/wol" }, "Wake-on-LAN"), " page."))),
+    card("Commands", "Send these from a radio contact with Commands ticked.", h("div", { class: "kv" },
+      h("div", null, h("code", null, "status")), h("div", null, "Which devices are online, and this PC's internet."),
+      h("div", null, h("code", null, "status <device>")), h("div", null, "One device: online or last seen, and its address."),
+      h("div", null, h("code", null, "ping")), h("div", null, "Checks the link and tells you how well Sphynx hears you."),
+      h("div", null, h("code", null, "wake <computer> <code>")), h("div", null, "Switches on a computer with Wake-on-LAN."),
+      h("div", null, h("code", null, "help")), h("div", null, "The list of commands."),
+      h("div", null, h("code", null, "@laptop on my way")), h("div", null, "With Chat ticked: a chat message for one device. Anything that isn't a command goes to Sphynx Chat.")))));
+
+  parts.push(card("Chat messages from radio go to", "A radio contact's messages go to every device that has a chat with it. Until one does, they go to the devices ticked here, or to Sphynx home on this PC (open http://localhost:3001) when none are.",
+    deliver.length ? h("div", { class: "radio-deliver" }, deliver) : h("p", { class: "muted small" }, "No devices yet.")));
+
+  parts.push(card("Log", "The last radio messages, newest first.", logBox));
+  el.replaceChildren(...parts);
+  every(5000, refresh);
 };
 
 // ---------- Public shares ----------

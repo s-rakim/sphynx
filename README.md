@@ -29,6 +29,9 @@ What you get:
   VPN app, built on Tailscale's Tailcat.
 - **Public shares**: publish one web service from your network on the
   internet, like Tailscale Funnel.
+- **Radio mode**: where there is no internet at all, reach Sphynx with
+  short text messages over long-range radio (Meshtastic LoRa or APRS):
+  check on home, wake a computer, and chat with your devices.
 
 Sphynx is built on [Headscale](https://github.com/juanfont/headscale) (the
 open-source Tailscale control server) and the official
@@ -49,11 +52,12 @@ unmodified at build time. See [License and credits](#license-and-credits).
 10. [Weak-signal mode](#9-weak-signal-mode)
 11. [Sphynx Link](#10-sphynx-link)
 12. [Public shares](#11-public-shares)
-13. [Everything else](#12-everything-else)
-14. [Backup, update and uninstall](#backup-update-and-uninstall)
-15. [Troubleshooting](#troubleshooting)
-16. [Security notes](#security-notes)
-17. [License and credits](#license-and-credits)
+13. [Radio mode](#12-radio-mode)
+14. [Everything else](#13-everything-else)
+15. [Backup, update and uninstall](#backup-update-and-uninstall)
+16. [Troubleshooting](#troubleshooting)
+17. [Security notes](#security-notes)
+18. [License and credits](#license-and-credits)
 
 ## How it works
 
@@ -471,7 +475,93 @@ shares**, allow them, then add a share: a name, the device and its port.
 Anyone on the internet can open these addresses, so only share services that
 have their own login.
 
-## 12. Everything else
+## 12. Radio mode
+
+For places with no internet at all: no mobile signal, no Wi-Fi, no
+satellite. A long-range radio with you sends short text messages to a radio
+at home, and Sphynx answers them. Radio carries text, not internet traffic:
+you can check on home, wake a computer and chat with your devices, but not
+browse the web.
+
+- **Commands**: `status` (which devices are online), `status laptop` (one
+  device), `ping` (checks the link and how well home hears you),
+  `wake Gaming PC 123456` (Wake-on-LAN, with a one-time code from an
+  authenticator app) and `help`.
+- **Chat**: every radio station is its own contact in Sphynx Chat. Its
+  messages go to the devices that chat with it, and their replies go back
+  over the radio with the device's name in front, like
+  `laptop: see you tomorrow`. Start a radio message with `@laptop` to reach
+  one device.
+
+### Pick a kind of radio
+
+| | Meshtastic (LoRa) | APRS (amateur packet radio) |
+|---|---|---|
+| Licence | None | An amateur radio licence |
+| Radios | Small LoRa radios for about US$30 to 100, used with the Meshtastic app on your phone | A VHF radio that sends APRS messages (like a Kenwood TH-D75 or Yaesu FT5D), or a radio with the APRSdroid app |
+| Range | A few km per radio, much further between hilltops. Other Meshtastic radios on the way pass messages on, up to 7 hops | Tens of km to the nearest digipeater or internet gateway (iGate). From an iGate, the internet's APRS-IS network carries it to Sphynx, however far away |
+| Privacy | Encrypted on the air; Sphynx reads them to pass them on | Public: anyone can read them, for example on aprs.fi |
+| Message size | About 200 characters per radio message | 67 characters per radio message |
+
+For devices 1000 km apart, Meshtastic only helps if radios relay the whole
+way. APRS is the realistic choice: your message needs to reach one iGate
+near you, and APRS-IS does the rest. Where no iGate is in reach, only HF
+radio (APRS on the 30 m band, which needs an HF radio and licence) carries
+that far. You can turn on both kinds.
+
+### Set it up
+
+1. **A radio at home** that Sphynx can reach:
+   - *Meshtastic*: a Meshtastic radio with Wi-Fi or Ethernet. Set it up with
+     the Meshtastic app, turn on Wi-Fi (or Ethernet) in its **Network**
+     settings, and give it a fixed address in your router. On Linux you can
+     plug it into the PC by USB instead: uncomment `devices` in
+     `docker-compose.yml` and use the port, like `/dev/ttyUSB0`, as its
+     address. Keep this radio for Sphynx: a phone connected to the same
+     radio can take the messages first.
+   - *APRS*: Sphynx can use the internet's APRS-IS network with just your
+     callsign and its APRS-IS passcode (APRS apps for licensed amateurs give
+     it to you). It can also send and listen through a radio at home with a
+     KISS TNC on your network, like [Dire Wolf](https://github.com/wb2osz/direwolf)
+     (`host:8001`).
+2. **A radio with you**: another Meshtastic radio paired with the Meshtastic
+   app on your phone (same region and channel settings as the home radio),
+   or an APRS radio.
+3. In the admin page, open **Radio**: turn on radio mode, tick Meshtastic
+   and enter the home radio's address, and/or tick APRS and enter a callsign
+   for Sphynx with its own SSID (like `5Z4ABC-10`), the passcode and the
+   server. Save. The radios show as **Connected**.
+4. Add your own radios as **Radio contacts**: the Meshtastic radios the home
+   radio knows are listed with **Add as contact**; for APRS, enter your own
+   callsign (like `5Z4ABC-7`). Tick **Commands** and/or **Chat** for each,
+   and save. Only your contacts can use Sphynx; anyone else is ignored and
+   listed under **Recently heard**.
+5. To wake computers over the radio, click **Set up wake codes** and scan the
+   QR code with an authenticator app (Google Authenticator, Microsoft
+   Authenticator, Aegis, 2FAS and so on). The computers come from the
+   **Wake-on-LAN** page.
+6. From your radio, send `help`. In the Meshtastic app, open the home radio
+   in the node list and send it a direct message; with APRS, send a message
+   to Sphynx's callsign.
+
+### Good to know
+
+- Waking always needs a code, because radio ids and callsigns can be faked.
+  Each code works once, and 5 wrong codes stop waking for an hour.
+- Messages from a radio contact that no device chats with yet go to the
+  devices picked under **Chat messages from radio go to**, or to Sphynx home
+  (http://localhost:3001 on this PC).
+- Only text goes over the radio. Long messages are split into a few radio
+  messages and cut after about 500 characters (Meshtastic) or 240 (APRS);
+  the chat shows the limit. A photo's caption and a shared location go as
+  text; photos, voice notes and calls don't. Two ticks mean the station's
+  radio confirmed it got the message; if it didn't, the chat says so.
+- APRS is amateur radio: your licence rules apply, and everything sent is
+  public.
+- The **Log** on the Radio page shows what came in and went out (wake codes
+  hidden).
+
+## 13. Everything else
 
 - **Devices**: rename, tag, expire, remove; see each device's connection
   (direct, peer relay or relayed) and its exit node and routes.
@@ -545,6 +635,13 @@ app.
 - **Wake-on-LAN doesn't wake the computer**: wake it while it's asleep (not
   unplugged), over a cable, and make sure the sending device is online and on
   the same home network.
+- **The Meshtastic radio doesn't connect**: check its address, that Wi-Fi or
+  Ethernet is on in its Network settings, and that no other app is connected
+  to it over the network. USB radios work when Sphynx runs on Linux with the
+  port passed to the container.
+- **A radio message gets no answer**: the Radio page's **Log** and **Recently
+  heard** show whether it arrived. Check that the station is one of your
+  radio contacts with Commands or Chat ticked.
 - **Start over with a device**: remove it on the Devices page, log out in the
   Tailscale app and connect again.
 
@@ -560,6 +657,10 @@ app.
   encryption (built on the audited noble libraries), and the page could read
   its own private key, which the browser's built-in tools prevent; the HTTPS
   address avoids that.
+- Radio mode only answers your radio contacts, and waking computers over the
+  radio always needs a one-time code. Radio messages aren't end-to-end
+  encrypted (Sphynx reads them to pass them on) and APRS messages are
+  public, so don't send secrets over the radio.
 - Keep Sphynx updated, and keep backups private.
 
 ## License and credits
@@ -581,6 +682,9 @@ Tailscale Inc. or the Headscale authors.
 ### For developers
 
 - Go 1.26 or newer: `go test ./...`
+- Try radio mode without radios: `go run ./internal/radio/fakeradio` runs a
+  pretend Meshtastic radio and APRS-IS server, and a small web API that
+  sends messages from radios in the field (see the top of its `main.go`).
 - Sphynx Chat's API tests drive the chat server with the web app's own
   encryption code: `cd internal/chat/test && npm ci && npm test`
 - The chat's http encryption bundle is built from `internal/chat/webcrypto`:

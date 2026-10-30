@@ -39,6 +39,7 @@ type Settings struct {
 	Share      ShareSettings      `json:"share"`
 	WoL        WoLSettings        `json:"wol"`
 	Chat       ChatSettings       `json:"chat"`
+	Radio      RadioSettings      `json:"radio"`
 	Features   FeatureSettings    `json:"features"`
 	LogLevel   string             `json:"logLevel"`
 }
@@ -180,6 +181,7 @@ func DefaultSettings() Settings {
 		},
 		Link:     LinkSettings{ExitNode: true, Inbox: true, Allow: []LinkClient{}},
 		Chat:     ChatSettings{Enabled: true, MaxUploadMB: 2048, Secure: true},
+		Radio:    defaultRadioSettings(),
 		Features: FeatureSettings{Taildrop: true},
 		LogLevel: "info",
 	}
@@ -331,6 +333,10 @@ type Secrets struct {
 	PasswordHash string `json:"passwordHash"`
 	PasswordSalt string `json:"passwordSalt"`
 	OIDCSecret   string `json:"oidcSecret"`
+	// APRSPasscode signs Sphynx in to APRS-IS so it can send.
+	APRSPasscode string `json:"aprsPasscode,omitempty"`
+	// RadioTOTP is the secret behind the wake codes accepted over radio.
+	RadioTOTP string `json:"radioTotp,omitempty"`
 }
 
 // jsonFile is a JSON document on disk guarded by a mutex.

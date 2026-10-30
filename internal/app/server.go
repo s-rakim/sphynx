@@ -166,6 +166,12 @@ func (a *App) adminHandler() http.Handler {
 	api("GET /api/chat", a.apiChat)
 	api("PUT /api/chat", a.apiChatSave)
 
+	api("GET /api/radio", a.apiRadio)
+	api("PUT /api/radio", a.apiRadioSave)
+	api("POST /api/radio/code", a.apiRadioCode)
+	api("DELETE /api/radio/code", a.apiRadioCodeDelete)
+	api("POST /api/radio/test", a.apiRadioTest)
+
 	api("GET /api/link", a.apiLink)
 	api("PUT /api/link", a.apiLinkSave)
 	api("POST /api/link/rotate", a.apiLinkRotate)

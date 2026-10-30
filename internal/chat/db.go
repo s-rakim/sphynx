@@ -152,6 +152,14 @@ CREATE TABLE IF NOT EXISTS status_views (
 
 CREATE TABLE IF NOT EXISTS blocks (user_id TEXT NOT NULL, blocked_id TEXT NOT NULL, PRIMARY KEY (user_id, blocked_id));
 
+-- Radio contacts' bridge "browsers" (see radio.go): Sphynx keeps their
+-- private keys to pass messages between the chat and the radio.
+CREATE TABLE IF NOT EXISTS radio_keys (
+  user_id TEXT PRIMARY KEY,
+  device_id TEXT NOT NULL,
+  private_key TEXT NOT NULL          -- P-256 private key, base64url
+);
+
 CREATE TABLE IF NOT EXISTS calls (
   id TEXT PRIMARY KEY,
   chat_id TEXT NOT NULL,

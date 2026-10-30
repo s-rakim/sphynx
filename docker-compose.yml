@@ -34,6 +34,10 @@ services:
       - "41641:41641/udp"
     volumes:
       - sphynx-data:/data
+    # Radio mode with a Meshtastic radio plugged in by USB (Linux only):
+    # uncomment, and use the radio's port (ls /dev/ttyUSB* /dev/ttyACM*).
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
 
 volumes:
   sphynx-data:

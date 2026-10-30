@@ -5,7 +5,7 @@ import * as A from './app.js';
 import { S, api, render } from './app.js';
 import { kvDelete } from './api.js';
 import { newMessageId, nativeCrypto } from './crypto.js';
-import { net, address, secure, canNotify, needsHttps, deviceLine, reachable, copyText } from './sphynx.js';
+import { net, address, secure, canNotify, needsHttps, deviceLine, isRadio, reachable, copyText } from './sphynx.js';
 import { h, icon, iconButton, avatar, toast, menu, dialog, confirmDialog, promptDialog, listTime, duration, reconcile, Slots, toggle } from './ui.js';
 import { resizePhoto, kindFor } from './media.js';
 import * as O from './overlays.js';
@@ -158,7 +158,7 @@ function devicesWithoutChat() {
 }
 
 function deviceRow(u) {
-  const sig = JSON.stringify([u.name, u.device, u.os, u.owner, u.joined, u.onNetwork, u.avatar, u.about]);
+  const sig = JSON.stringify([u.name, u.device, u.os, u.owner, u.joined, u.onNetwork, u.avatar, u.about, u.radio]);
   return slots.get(`device:${u.id}`, sig, () => userRow(u, () => openDevice(u.id)));
 }
 
@@ -333,7 +333,8 @@ function chatsTab() {
       !shown.length
         ? h('div', { class: 'empty' }, S.filter === 'unread' ? 'No unread chats' : S.filter === 'groups' ? 'No groups yet' : others.length ? 'No chats yet. Pick a device below to start one.' : 'No chats yet. Start one with the new chat button.')
         : null,
-      S.filter === 'all' && others.length ? [h('div', { class: 'list-section' }, 'Other devices on your network'), others.map(deviceRow)] : null,
+      S.filter === 'all' && others.some((u) => !isRadio(u)) ? [h('div', { class: 'list-section' }, 'Other devices on your network'), others.filter((u) => !isRadio(u)).map(deviceRow)] : null,
+      S.filter === 'all' && others.some(isRadio) ? [h('div', { class: 'list-section' }, 'Radio contacts'), others.filter(isRadio).map(deviceRow)] : null,
       shown.length || others.length ? h('div', { class: 'empty small' }, icon('lock'), ' Your personal messages are end-to-end encrypted') : null,
     ];
   }
@@ -657,7 +658,7 @@ async function removeGroup(c, g) {
 // ---------- calls tab ----------
 
 async function newCall(video) {
-  const ids = await O.pickUsers({ title: video ? 'New video call' : 'New voice call', multiple: false });
+  const ids = await O.pickUsers({ title: video ? 'New video call' : 'New voice call', multiple: false, noRadio: true });
   if (!ids?.length) return;
   try {
     const { chat } = await api.post('/api/chats/direct', { userId: ids[0] });
@@ -801,7 +802,8 @@ function matchUsers(q, exclude = new Set(), onlyReachable = false) {
 
 function newChatPanel() {
   const q = panelSearchEl?.value.trim().toLowerCase() || '';
-  const users = matchUsers(q);
+  const users = matchUsers(q).filter((u) => !isRadio(u));
+  const radios = matchUsers(q).filter(isRadio);
   return panelShell('New chat', [
     panelSearch('Search devices'),
     !q ? [
@@ -813,6 +815,7 @@ function newChatPanel() {
     h('div', { class: 'list-section' }, 'Devices on your network'),
     users.map((u) => userRow(u, () => openDevice(u.id))),
     !users.length ? h('div', { class: 'empty' }, q ? 'No devices found' : 'No other devices on your Sphynx network yet. Add one in the Sphynx admin page, under Add device.') : null,
+    radios.length ? [h('div', { class: 'list-section' }, 'Radio contacts'), radios.map((u) => userRow(u, () => openDevice(u.id)))] : null,
   ]);
 }
 
@@ -829,7 +832,7 @@ function newGroupPanel() {
       ...panelShell('Add group members', [
         h('div', { class: 'chips-sel pad' }, [...ng.members].map((id) => h('button', { type: 'button', class: 'chip', onclick: () => { ng.members.delete(id); render(); } }, A.nameOf(id), ' ×'))),
         panelSearch('Search devices'),
-        matchUsers(q, new Set(), true).map((u) => h(
+        matchUsers(q, new Set(), true).filter((u) => !isRadio(u)).map((u) => h(
           'div',
           { class: 'row', onclick: () => { if (ng.members.has(u.id)) ng.members.delete(u.id); else ng.members.add(u.id); render(); } },
           avatar(u, 'md'),
@@ -1058,7 +1061,7 @@ function helpPanel() {
 const broadcasts = () => (Array.isArray(S.prefs.broadcasts) ? S.prefs.broadcasts : []);
 
 async function newBroadcast() {
-  const ids = await O.pickUsers({ title: 'New broadcast: pick recipients', okLabel: 'Next' });
+  const ids = await O.pickUsers({ title: 'New broadcast: pick recipients', okLabel: 'Next', noRadio: true });
   if (!ids?.length) return;
   const name = await promptDialog('Broadcast list name', { value: ids.map(A.nameOf).join(', ').slice(0, 60), okLabel: 'Create', max: 60 });
   if (name === null) return;

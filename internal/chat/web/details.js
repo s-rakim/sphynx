@@ -5,7 +5,7 @@ import { S, api, render } from './app.js';
 import { h, icon, iconButton, avatar, toast, menu, dialog, promptDialog, confirmDialog, listTime, dayLabel, timeOf, fileSize, disappearingLabel, lastSeenText, richText, reconcile, Slots, toggle } from './ui.js';
 import { extensionOf, resizePhoto } from './media.js';
 import * as O from './overlays.js';
-import { jumpTo, clearChat, deleteChat, exitGroup, exitLabel, blockUser, openCommunity } from './conversation.js';
+import { jumpTo, clearChat, deleteChat, exitGroup, exitLabel, blockUser, openCommunity, radioContact } from './conversation.js';
 import { copyText, deviceLine } from './sphynx.js';
 
 const slots = new Slots();
@@ -161,7 +161,7 @@ function memberMenu(chat, member, anchor) {
 }
 
 export async function addMembers(chat) {
-  const ids = await O.pickUsers({ title: 'Add members', exclude: chat.members.filter((m) => !m.left).map((m) => m.userId), okLabel: 'Add' });
+  const ids = await O.pickUsers({ title: 'Add members', exclude: chat.members.filter((m) => !m.left).map((m) => m.userId), okLabel: 'Add', noRadio: true });
   if (!ids?.length) return;
   try {
     await api.post(`/api/chats/${encodeURIComponent(chat.id)}/members`, { userIds: ids });
@@ -197,6 +197,8 @@ function settingsSection(chat) {
     chat.type === 'group' && chat.me.role === 'admin' && !chat.me.left ? menuRow('settings', 'Group settings', null, () => groupSettingsDialog(chat)) : null,
     A.isChannel(chat)
       ? menuRow('info', 'Not end-to-end encrypted', "Like WhatsApp channels, posts are stored as they are so anyone can follow. Don't post secrets here.", () => {})
+      : radioContact(chat)
+      ? menuRow('info', 'Not end-to-end encrypted', radioContact(chat).radio === 'aprs' ? 'APRS radio messages are public: anyone can read them.' : 'The Sphynx server reads these messages to pass them on over the radio.', () => {})
       : menuRow('lock', 'Encryption', 'Messages and calls are end-to-end encrypted. Click to verify.', () => O.securityCodeDialog(chat)),
   );
 }
@@ -221,8 +223,8 @@ function directInfo(chat) {
         !self && !chat.me.left ? h(
           'div',
           { class: 'card-actions' },
-          h('button', { type: 'button', onclick: () => O.startCall(chat, false) }, icon('phone'), 'Audio'),
-          h('button', { type: 'button', onclick: () => O.startCall(chat, true) }, icon('video'), 'Video'),
+          radioContact(chat) ? null : h('button', { type: 'button', onclick: () => O.startCall(chat, false) }, icon('phone'), 'Audio'),
+          radioContact(chat) ? null : h('button', { type: 'button', onclick: () => O.startCall(chat, true) }, icon('video'), 'Video'),
           h('button', { type: 'button', onclick: () => { S.details = 'search'; render(); } }, icon('search'), 'Search'),
         ) : null,
       ),

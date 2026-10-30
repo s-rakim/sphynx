@@ -442,3 +442,14 @@ dialog .dfoot { padding: 12px 20px 16px; display: flex; justify-content: flex-en
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .loading { padding: 40px; text-align: center; color: var(--muted); }
+
+.radio-contact { border-bottom: 1px solid var(--border); padding-top: 10px; }
+.radio-contact:first-child { padding-top: 0; }
+.row.middle { align-items: center; margin-bottom: 4px; }
+.row.middle .check { margin-bottom: 8px; }
+.radio-deliver { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; }
+.qr-wrap { display: flex; justify-content: center; margin: 8px 0 14px; }
+.qr { width: 220px; height: 220px; background: #fff; padding: 8px; border-radius: 8px; }
+.bad-text { color: var(--bad); }
+.list-plain .primary-text { font-weight: 600; }
+.list-plain .secondary-text { color: var(--muted); font-size: 13px; }

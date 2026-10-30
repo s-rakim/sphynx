@@ -7,7 +7,7 @@ import {
 } from './ui.js';
 import { extensionOf, kindFor, VoiceRecorder } from './media.js';
 import * as O from './overlays.js';
-import { address, canUseMedia, copyText, deviceLine, needsHttps, reachable, secure } from './sphynx.js';
+import { address, canUseMedia, copyText, deviceLine, isRadio, needsHttps, radioNote, radioRoom, reachable, secure } from './sphynx.js';
 
 const { str, num, safeThumb } = O;
 export const drafts = new Map(); // chatId -> unsent text
@@ -37,6 +37,7 @@ export function canSend(chat) {
     if (other && !A.isMe(other.id) && other.blocked) {
       return { text: `You blocked ${other.name}. Click to unblock.`, action: () => api.del(`/api/blocks/${encodeURIComponent(other.id)}`).catch((e) => toast(e.message)) };
     }
+    if (other?.radio === 'removed') return { text: `${other.name} is no longer one of your radio contacts.` };
     // Messages are sealed to the other device's browsers; it needs one first.
     if (other && !A.isMe(other.id) && !reachable(other)) {
       return {
@@ -47,6 +48,13 @@ export function canSend(chat) {
     }
   }
   return null;
+}
+
+// The radio contact a chat is with, if it is with one.
+export function radioContact(chat) {
+  if (chat?.type !== 'direct') return null;
+  const u = S.users.get(A.otherMember(chat));
+  return isRadio(u) ? u : null;
 }
 
 export async function followChannel(chatId, follow) {
@@ -138,7 +146,9 @@ function deleteDialog(m, chat) {
   };
   dialog({
     title: 'Delete message?',
-    content: h('p', { class: 'muted' }, forEveryone && !mine ? `As an admin you can delete ${A.nameOf(m.senderId)}'s message for everyone.` : 'Deleting for everyone removes the message and its files from the server.'),
+    content: h('p', { class: 'muted' }, radioContact(chat)
+      ? "Deleting removes the message from Sphynx only: what already went out over the radio can't be called back."
+      : forEveryone && !mine ? `As an admin you can delete ${A.nameOf(m.senderId)}'s message for everyone.` : 'Deleting for everyone removes the message and its files from the server.'),
     actions: [
       { label: 'Cancel', onClick: (close) => close() },
       { label: 'Delete for me', onClick: del(false) },
@@ -155,7 +165,8 @@ export function messageMenu(m, chat, anchor) {
   const live = m.kind === 'msg' && !m.pending && !m.failed && !m.deletedAt && c && !['deleted', 'opened'].includes(c.type);
   const active = !chat.me.left;
   const mayPin = active && (!A.isGroupish(chat) || !chat.adminsOnlyEdit || chat.me.role === 'admin');
-  const editable = mine && live && c.type === 'text' && !m.viewOnce && Date.now() - m.createdAt < (S.limits.editWindowSeconds || 0) * 1000;
+  // An edit can't follow a message out over the radio.
+  const editable = mine && live && c.type === 'text' && !m.viewOnce && !radioContact(chat) && Date.now() - m.createdAt < (S.limits.editWindowSeconds || 0) * 1000;
   menu(
     anchor,
     [
@@ -588,7 +599,10 @@ function renderMessages(chat) {
   if (b.loading && b.hasMore) nodes.push(v.rows.get('loading', '1', () => h('div', { class: 'day' }, 'Loading…')));
   if (!b.hasMore) {
     used.add('e2e');
-    nodes.push(v.rows.get('e2e', chat.type, () => (A.isChannel(chat)
+    const radio = radioContact(chat);
+    nodes.push(v.rows.get('e2e', JSON.stringify([chat.type, radio?.name, radio?.radio, radio?.radioMax, S.me.name]), () => (radio
+      ? h('div', { class: 'e2e-note warn' }, icon('info'), radioNote(radio, S.me.name))
+      : A.isChannel(chat)
       ? h(
         'div',
         { class: 'e2e-note warn' },
@@ -771,7 +785,7 @@ function header(chat) {
   const sub = subtitle(chat);
   const av = A.chatAvatar(chat);
   const self = chat.type === 'direct' && A.isMe(A.otherMember(chat));
-  const callable = !chat.me.left && !self && !canSend(chat) && (chat.type === 'direct' || chat.type === 'group');
+  const callable = !chat.me.left && !self && !canSend(chat) && (chat.type === 'direct' || chat.type === 'group') && !radioContact(chat);
   const sig = JSON.stringify([chat.id, A.chatTitle(chat), av, sub, S.details, callable, chat.me.mutedUntil, chat.me.left, chat.me.role, chat.adminsOnlyEdit, !!A.calls?.call]);
   return slots.get('header', sig, () => {
     let moreBtn;
@@ -999,6 +1013,10 @@ async function contactDialog(chat) {
 }
 
 function attachMenu(chat, anchor) {
+  if (radioContact(chat)) {
+    menu(anchor, [{ label: 'Location', icon: 'location', onClick: () => locationDialog(chat) }]);
+    return;
+  }
   menu(anchor, [
     { label: 'Document', icon: 'document', onClick: () => pickFiles('*/*', true, (f) => attachDialog(chat, f, { asDocument: true })) },
     { label: 'Photos & videos', icon: 'image', onClick: () => pickFiles('image/*,video/*', true, (f) => attachDialog(chat, f)) },
@@ -1021,8 +1039,11 @@ function mentionCandidates(chat, query) {
 }
 
 function buildComposer(chat) {
-  const c = { chatId: chat.id, mentionIndex: 0, mentions: [] };
-  c.ta = h('textarea', { rows: 1, placeholder: 'Type a message', maxlength: 65536, 'aria-label': 'Message' });
+  const radio = radioContact(chat);
+  // Radio contacts get text only, with the sender's name in front.
+  const c = { chatId: chat.id, mentionIndex: 0, mentions: [], radio: !!radio };
+  const maxlength = radioRoom(radio, S.me.name) || 65536;
+  c.ta = h('textarea', { rows: 1, placeholder: radio ? 'Radio message' : 'Type a message', maxlength, 'aria-label': 'Message' });
   c.ta.value = drafts.get(chat.id) || '';
   c.ctx = h('div', { class: 'ctx hidden' });
   c.pop = h('div', { class: 'mentions-pop hidden' });
@@ -1080,10 +1101,11 @@ function buildComposer(chat) {
     const files = [...(e.clipboardData?.files || [])];
     if (files.length) {
       e.preventDefault();
-      attachDialog(S.chats.get(chat.id), files);
+      if (c.radio) toast('Only text goes over the radio');
+      else attachDialog(S.chats.get(chat.id), files);
     }
   });
-  c.action.addEventListener('click', () => (c.ta.value.trim() || S.editing ? send(c) : startRecording(c)));
+  c.action.addEventListener('click', () => (c.ta.value.trim() || S.editing ? send(c) : c.radio ? c.ta.focus() : startRecording(c)));
   updateAction(c);
   setTimeout(() => autosize(c.ta), 0);
   return c;
@@ -1109,7 +1131,7 @@ function insertText(ta, text) {
 }
 
 function updateAction(c) {
-  const sending = !!c.ta.value.trim() || !!S.editing;
+  const sending = !!c.ta.value.trim() || !!S.editing || c.radio;
   const name = S.editing ? 'check' : sending ? 'send' : 'mic';
   if (c.actionName === name) return;
   c.actionName = name;
@@ -1234,7 +1256,7 @@ function composer(chat) {
     }
     return slots.get('blocked', blocked.text, () => h('footer', { class: 'composer' }, h('div', { class: `notice${blocked.action ? ' link' : ''}`, onclick: blocked.action }, blocked.text)));
   }
-  if (comp?.chatId !== chat.id) {
+  if (comp?.chatId !== chat.id || comp.radio !== !!radioContact(chat)) {
     if (comp?.recorder) comp.recorder.cancel();
     comp = buildComposer(chat);
   }

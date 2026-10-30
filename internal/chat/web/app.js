@@ -409,6 +409,10 @@ export function systemText(m, c) {
       return `${who} removed the group "${c.name}"`;
     case 'deactivated':
       return `${who} deactivated this community`;
+    case 'radio-failed':
+      return `Not delivered over the radio: ${c.error || 'unknown error'}`;
+    case 'radio-note':
+      return String(c.note || '');
     default:
       return 'Group updated';
   }

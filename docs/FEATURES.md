@@ -44,6 +44,7 @@ These aren't in Tailscale; see the [README](../README.md) for each.
 | Weak-signal mode | ✅. Turns on the Tailscale app options that help on bad mobile networks (offline peer list, client-side reachability, UDP lifetime probing, automatic exit node, packet size discovery), plus a per-device "TCP 443 only" mode for strict firewalls. |
 | Sphynx Link | ✅. A way home without port forwarding or a VPN app, using Tailscale's Tailcat. Starting and stopping it is tested; a live link needs internet access, which the test setup doesn't have. |
 | Public shares | ✅ **tested**. Sphynx's stand-in for Funnel (see below). |
+| Radio mode | ✅ **tested** with pretend radios. Short text messages over Meshtastic (LoRa) or APRS radio reach Sphynx without internet: status, ping, wake a computer with a one-time code, and chats in Sphynx Chat where each radio station is a contact. |
 | One-file backup | ✅. Settings, keys, the device database and the chat in one ZIP file. |
 
 ## Start

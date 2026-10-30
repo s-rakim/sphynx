@@ -75,6 +75,10 @@ type userView struct {
 	Joined bool `json:"joined"`
 	// OnNetwork: the device is still part of the tailnet.
 	OnNetwork bool `json:"onNetwork"`
+	// Radio: a radio contact's link ("meshtastic" or "aprs"), or "removed";
+	// RadioMax: how long a message to it can be, the sender's name included.
+	Radio    string `json:"radio,omitempty"`
+	RadioMax int    `json:"radioMax,omitempty"`
 }
 
 func (s *Server) userView(u *userRow, viewer string) userView {
@@ -98,6 +102,7 @@ func (s *Server) userView(u *userRow, viewer string) userView {
 		Joined:    s.db.exists("SELECT 1 FROM devices WHERE user_id = ? AND revoked_at IS NULL", u.ID),
 		OnNetwork: s.onNetwork(u.ID),
 	}
+	v.Radio, v.RadioMax = s.radioLink(u.ID)
 	if v.Avatar == nil && u.TailscaleAvatar != nil {
 		v.Avatar = u.TailscaleAvatar
 	}

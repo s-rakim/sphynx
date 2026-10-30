@@ -54,6 +54,7 @@ type App struct {
 	front   *front
 	link    *link
 	chat    *chatService
+	radio   *radioService
 	limiter *loginLimiter
 	// signinLimiter guards the public device sign-in page.
 	signinLimiter *loginLimiter
@@ -104,6 +105,7 @@ func New(cfg Config) (*App, error) {
 	if a.chat, err = newChatService(a); err != nil {
 		return nil, err
 	}
+	a.radio = newRadioService(a)
 	return a, nil
 }
 
@@ -170,6 +172,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	go a.chat.srv.Run(ctx)
 	go a.chat.watchSecure(ctx)
+	go a.radio.apply(ctx)
 
 	errc := make(chan error, 3)
 	go func() { errc <- a.serveAdmin(ctx) }()

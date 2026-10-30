@@ -17,7 +17,8 @@ also wrote Sphynx; it is included here under Sphynx's license.
 | [Tailscale](https://github.com/tailscale/tailscale) | 1.104.4 | Official client for Sphynx home (`tailscale`, `tailscaled`) | BSD 3-Clause |
 | [Tailcat](https://github.com/tailscale/tailcat) | 0.7.0 | Sphynx Link (`/usr/local/bin/tailcat`) | BSD 3-Clause |
 | [hujson](https://github.com/tailscale/hujson) | 2025-06-05 | Reading and writing policy files | BSD 3-Clause |
-| [Go x/crypto, x/net, x/text, x/sys](https://go.googlesource.com/) | 0.41.0, 0.42.0, 0.28.0, 0.48.0 | Let's Encrypt (ACME) client, system calls | BSD 3-Clause |
+| [Go x/crypto, x/net, x/text, x/sys](https://go.googlesource.com/) | 0.41.0, 0.42.0, 0.28.0, 0.48.0 | Let's Encrypt (ACME) client, system calls, USB radios | BSD 3-Clause |
+| [rsc.io/qr](https://github.com/rsc/qr) | 0.2.0 | The QR code for setting up radio wake codes in an authenticator app | BSD 3-Clause |
 | [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) | 1.60.1 | Sphynx Chat's database (SQLite in pure Go; SQLite itself is public domain) | BSD 3-Clause |
 | [modernc.org/libc, mathutil, memory](https://gitlab.com/cznic) | 1.77.1, 1.7.1, 1.12.1 | Used by modernc.org/sqlite | BSD 3-Clause |
 | [coder/websocket](https://github.com/coder/websocket) | 1.8.15 | Sphynx Chat's live updates | ISC |
@@ -187,6 +188,38 @@ copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
    * Neither the name of Google LLC nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## rsc.io/qr
+
+```
+Copyright (c) 2009 The Go Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 

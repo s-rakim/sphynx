@@ -286,23 +286,7 @@ func (s *Server) apiDirect(c *reqCtx) any {
 	if !s.ensureUser(other) {
 		fail(404, "No such user")
 	}
-	pair := []string{c.uid(), other}
-	slices.Sort(pair)
-	key := strings.Join(pair, "|")
-	var chat *chatRow
-	var found chatRow
-	if s.db.one(scanChat(&found), "SELECT "+chatCols+" FROM chats WHERE direct_key = ?", key) {
-		chat = &found
-	} else {
-		chatID := newID(16)
-		s.db.inTx(func() {
-			s.db.run("INSERT INTO chats (id, type, created_by, created_at, direct_key) VALUES (?, 'direct', ?, ?, ?)", chatID, c.uid(), now(), key)
-			for _, uid := range uniq([]string{c.uid(), other}) {
-				s.db.run("INSERT INTO members (chat_id, user_id, role, joined_at) VALUES (?, ?, 'member', ?)", chatID, uid, now())
-			}
-		})
-		chat = s.getChat(chatID)
-	}
+	chat := s.directChat(c.uid(), other)
 	s.db.run("UPDATE members SET removed = 0 WHERE chat_id = ? AND user_id = ?", chat.ID, c.uid())
 	return map[string]any{"chat": s.chatView(chat, c.uid())}
 }
@@ -829,6 +813,9 @@ func (s *Server) apiSend(c *reqCtx) any {
 	})
 	s.broadcastMessage(m, "message", sendOpts{})
 	s.broadcastChat(chat.ID)
+	if chat.Type == "direct" {
+		s.radioOutgoing(chat, m, c.user)
+	}
 	return map[string]any{"message": s.messageView(m, uid)}
 }
 
@@ -1072,7 +1059,7 @@ func (s *Server) apiStatuses(c *reqCtx) any {
 // browser on the server (every device on the tailnet that uses the chat),
 // like "My contacts" on WhatsApp.
 func (s *Server) apiStatusDevices(c *reqCtx) any {
-	return map[string]any{"devices": s.devices("SELECT " + deviceCols + " FROM devices WHERE revoked_at IS NULL")}
+	return map[string]any{"devices": s.devices("SELECT " + deviceCols + " FROM devices WHERE revoked_at IS NULL AND id NOT IN (SELECT device_id FROM radio_keys)")}
 }
 
 func (s *Server) apiPostStatus(c *reqCtx) any {

@@ -4,7 +4,7 @@ import { S, api, calls, render, nameOf, isMe, chatTitle, chatAvatar, contentOf, 
 import { h, icon, iconButton, avatar, dialog, toast, viewer, timeOf, listTime, dayLabel, fileSize, duration, reconcile } from './ui.js';
 import { securityCode } from './crypto.js';
 import { kindFor, safeName } from './media.js';
-import { address, canUseMedia, copyText, deviceLine, needsHttps, reachable } from './sphynx.js';
+import { address, canUseMedia, copyText, deviceLine, isRadio, needsHttps, reachable } from './sphynx.js';
 
 // ---------- small helpers for content from other people ----------
 
@@ -54,8 +54,9 @@ function userRow(u, extra, onClick) {
 const matches = (u, q) => [u.name, u.device, u.os, u.owner].some((x) => typeof x === 'string' && x.toLowerCase().includes(q));
 
 // Resolves to a list of user ids, or null when cancelled. Devices that
-// can't get messages yet are left out, unless everyone is set.
-export function pickUsers({ title, exclude = [], multiple = true, okLabel = 'Done', includeMe = false, everyone = false } = {}) {
+// can't get messages yet are left out, unless everyone is set, and radio
+// contacts when noRadio is.
+export function pickUsers({ title, exclude = [], multiple = true, okLabel = 'Done', includeMe = false, everyone = false, noRadio = false } = {}) {
   return new Promise((resolve) => {
     const chosen = new Set();
     let result = null;
@@ -63,7 +64,7 @@ export function pickUsers({ title, exclude = [], multiple = true, okLabel = 'Don
     const list = h('div', { class: 'pick-list' });
     const chips = h('div', { class: 'chips-sel' });
     const users = [...S.users.values()]
-      .filter((u) => !exclude.includes(u.id) && (includeMe || !isMe(u.id)) && (everyone || isMe(u.id) || reachable(u)))
+      .filter((u) => !exclude.includes(u.id) && (includeMe || !isMe(u.id)) && (everyone || isMe(u.id) || reachable(u)) && !(noRadio && isRadio(u)))
       .sort((a, b) => a.name.localeCompare(b.name));
     const draw = () => {
       const q = search.value.trim().toLowerCase();

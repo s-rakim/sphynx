@@ -171,6 +171,8 @@ type Server struct {
 	dirCache []Identity
 	dirAt    time.Time
 
+	radio radioState // under mu
+
 	ctx    context.Context
 	cancel context.CancelFunc
 }

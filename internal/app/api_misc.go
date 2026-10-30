@@ -2,6 +2,7 @@ package app
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -568,6 +569,7 @@ func (a *App) apiSettingsSave(w http.ResponseWriter, r *http.Request) (any, erro
 	req.DNS = old.DNS
 	req.Link = old.Link
 	req.Chat = old.Chat
+	req.Radio = old.Radio
 	req.ServerURL = strings.TrimRight(strings.TrimSpace(req.ServerURL), "/")
 	if req.Home.LANRoutes == nil {
 		req.Home.LANRoutes = []string{}
@@ -710,17 +712,26 @@ func (a *App) apiWoLDelete(w http.ResponseWriter, r *http.Request) (any, error) 
 }
 
 func (a *App) apiWoLWake(w http.ResponseWriter, r *http.Request) (any, error) {
-	id := r.PathValue("id")
 	var target *WakeTarget
 	for _, t := range a.state.Get().WakeTargets {
-		if t.ID == id {
+		if t.ID == r.PathValue("id") {
 			target = t
 		}
 	}
 	if target == nil {
 		return nil, notFound("no such wake target")
 	}
-	result, err := a.Wake(r, target)
+	result, err := a.wakeAndRecord(r.Context(), target)
+	if err != nil {
+		return nil, badRequest(err.Error())
+	}
+	return map[string]string{"result": result}, nil
+}
+
+// wakeAndRecord wakes a computer and notes how it went.
+func (a *App) wakeAndRecord(ctx context.Context, target *WakeTarget) (string, error) {
+	id := target.ID
+	result, err := a.Wake(ctx, target)
 	_ = a.state.Update(func(s *State) error {
 		for _, t := range s.WakeTargets {
 			if t.ID == id {
@@ -735,14 +746,15 @@ func (a *App) apiWoLWake(w http.ResponseWriter, r *http.Request) (any, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, badRequest(err.Error())
+		a.Logf("wake %s (%s) failed: %v", target.Name, target.MAC, err)
+		return "", err
 	}
 	a.Logf("wake %s (%s): %s", target.Name, target.MAC, result)
-	return map[string]string{"result": result}, nil
+	return result, nil
 }
 
 // Wake sends the magic packet for t and describes what happened.
-func (a *App) Wake(r *http.Request, t *WakeTarget) (string, error) {
+func (a *App) Wake(ctx context.Context, t *WakeTarget) (string, error) {
 	mac, err := wol.ParseMAC(t.MAC)
 	if err != nil {
 		return "", err
@@ -754,11 +766,11 @@ func (a *App) Wake(r *http.Request, t *WakeTarget) (string, error) {
 		}
 		return "sent from the Sphynx server to " + strings.Join(sent, ", "), nil
 	}
-	relay, err := a.hs.GetNode(r.Context(), t.RelayNodeID)
+	relay, err := a.hs.GetNode(ctx, t.RelayNodeID)
 	if err != nil {
 		return "", fmt.Errorf("relay device: %w", err)
 	}
-	res, err := a.wakeVia(r.Context(), *relay, mac.String())
+	res, err := a.wakeVia(ctx, *relay, mac.String())
 	if err != nil {
 		return "", err
 	}

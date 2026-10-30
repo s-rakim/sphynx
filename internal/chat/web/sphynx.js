@@ -22,6 +22,7 @@ export function needsHttps(what) {
 // a chat name of its own, then what it runs and whose it is.
 export function deviceLine(u) {
   if (!u) return '';
+  if (u.radio === 'removed') return 'No longer one of your radio contacts';
   if (u.onNetwork === false) return 'No longer on your Sphynx network';
   if (u.joined === false) return "Hasn't opened Sphynx Chat yet";
   const parts = [];
@@ -34,6 +35,23 @@ export function deviceLine(u) {
 // Messages are encrypted for each device's browsers; a device without one
 // can't receive anything yet.
 export const reachable = (u) => !!u && u.joined !== false && u.onNetwork !== false;
+
+// Radio contacts are stations in the field that Sphynx reaches over
+// long-range radio (Meshtastic or APRS). They only get text, sent as it is,
+// and only in one-to-one chats.
+export const isRadio = (u) => !!u?.radio && u.radio !== 'removed';
+
+// How long a message to a radio contact can be: Sphynx puts the sending
+// device's name in front.
+export const radioRoom = (u, myName) => (u?.radioMax ? Math.max(40, u.radioMax - Math.min(20, myName.length) - 2) : 0);
+
+export function radioNote(u, myName) {
+  const room = radioRoom(u, myName);
+  const limit = room ? `, up to about ${room} characters a message` : '';
+  return u.radio === 'aprs'
+    ? ` Messages with ${u.name} go over APRS radio as plain text, which anyone can read, including on websites such as aprs.fi. Only text goes over the radio${limit}. Calls, photos and files don't.`
+    : ` Messages with ${u.name} go over Meshtastic radio. They aren't end-to-end encrypted: the Sphynx server reads them to pass them on. Only text goes over the radio${limit}. Calls, photos and files don't.`;
+}
 
 export function copyText(text, done, toast) {
   const ok = () => toast?.(done);

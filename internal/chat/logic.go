@@ -255,6 +255,7 @@ func (s *Server) readNewChat(b body, me string) (string, string, *string, []stri
 		if !ok || !s.ensureUser(uid) {
 			fail(400, "Unknown member")
 		}
+		s.noRadio(uid)
 		if !seen[uid] {
 			seen[uid] = true
 			others = append(others, uid)
@@ -280,6 +281,7 @@ func (s *Server) addMembers(chat *chatRow, actor string, userIDs []string, quiet
 			if !s.ensureUser(uid) {
 				failf(400, "Unknown user %s", uid)
 			}
+			s.noRadio(uid)
 			existing := s.getMember(chat.ID, uid)
 			if existing != nil && existing.active() {
 				continue

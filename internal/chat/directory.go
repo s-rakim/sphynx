@@ -63,11 +63,15 @@ func (s *Server) directoryEntry(id string) (Identity, bool) {
 	return Identity{}, false
 }
 
-// onNetwork reports whether an account's device is still on the tailnet.
-// Without a directory (dev mode) everyone is.
+// onNetwork reports whether an account's device is still on the tailnet,
+// or a radio account is still a radio contact. Without a directory (dev
+// mode) every device is.
 func (s *Server) onNetwork(id string) bool {
-	if s.dir == nil {
+	if _, ok := s.radio.contacts[id]; ok {
 		return true
+	}
+	if s.dir == nil {
+		return !s.isRadioUser(id)
 	}
 	_, ok := s.directoryEntry(id)
 	return ok

@@ -76,6 +76,10 @@ func (s *Server) handleCallSignal(sk *socket, msg map[string]any) {
 		}
 		var others []string
 		for _, u := range s.activeMemberIDs(chatID) {
+			if s.isRadioUser(u) {
+				sendJSON(sk, map[string]any{"type": "call", "action": "error", "callId": callID, "message": "Radio contacts can't take calls: the radio only carries text"})
+				return
+			}
 			if u != userID && !s.eitherBlocked(u, userID) {
 				others = append(others, u)
 			}
