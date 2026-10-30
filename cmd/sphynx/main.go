@@ -29,7 +29,7 @@ func main() {
 		tailscale  = flag.String("tailscale", envOr("SPHYNX_TAILSCALE_BIN", "/usr/local/bin/tailscale"), "path to the tailscale CLI")
 		tailscaled = flag.String("tailscaled", envOr("SPHYNX_TAILSCALED_BIN", "/usr/local/bin/tailscaled"), "path to tailscaled")
 		tailcat    = flag.String("tailcat", envOr("SPHYNX_TAILCAT_BIN", "/usr/local/bin/tailcat"), "path to the tailcat CLI (Sphynx Link); empty disables it")
-		homePort   = flag.Int("home-wireguard-port", 41641, "UDP port of Sphynx home's WireGuard (publish it for direct connections)")
+		homePort   = flag.Int("home-wireguard-port", 41642, "UDP port of Sphynx home's WireGuard (publish it for direct connections; not 41641, which the Tailscale app on the same PC uses)")
 		chatAddr   = flag.String("chat", envOr("SPHYNX_CHAT_ADDR", ":3001"), "address where this PC opens Sphynx Chat as Sphynx home")
 	)
 	flag.Parse()

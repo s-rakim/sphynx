@@ -376,21 +376,27 @@ func (a *App) SyncPolicy(ctx context.Context) error {
 func (a *App) policyInputs(ctx context.Context) PolicyInputs {
 	s := a.settings.Get()
 	st := a.state.Get()
-	in := PolicyInputs{Resilience: s.Resilience, HomeRelay: s.Home.RelayPort > 0, Chat: s.Chat.Enabled}
+	in := PolicyInputs{Resilience: s.Resilience, HomeRelay: s.Home.RelayPort > 0, Chat: s.Chat.Enabled, AdminPort: a.adminPort()}
 	nodes, err := a.hs.ListNodes(ctx)
 	if err != nil {
 		return in
 	}
 	home := a.helpers.homeNodeID()
 	for _, n := range nodes {
-		if o := st.Devices[n.ID]; o != nil && o.StrictFirewall {
-			in.StrictIPs = append(in.StrictIPs, n.IPAddresses...)
+		if o := st.Devices[n.ID]; o != nil {
+			if o.StrictFirewall {
+				in.StrictIPs = append(in.StrictIPs, n.IPAddresses...)
+			}
+			if o.PeerRelay && n.ID != home {
+				in.RelayIPs = append(in.RelayIPs, n.IPAddresses...)
+			}
 		}
 		if n.ID == home && home != "" {
 			in.HomeIPs = append(in.HomeIPs, n.IPAddresses...)
 		}
 	}
 	slices.Sort(in.StrictIPs)
+	slices.Sort(in.RelayIPs)
 	return in
 }
 

@@ -20,9 +20,9 @@ services:
       # Optional: preset the address devices use, e.g. http://192.168.1.20:8080
       SPHYNX_SERVER_URL: ${SPHYNX_SERVER_URL:-}
     ports:
-      # Admin web UI. Only this PC can open it; other devices use the
-      # tailnet address http://sphynx-home:3000 once they're connected.
-      # Change to "3000:3000" to open it to your whole home network.
+      # Admin web UI at http://localhost:3000 on this PC. Every connected
+      # device opens it at http://sphynx-home:3000 instead.
+      # Change to "3000:3000" to open it to your whole home network too.
       - "127.0.0.1:3000:3000"
       # Sphynx Chat on this PC, at http://localhost:3001 (you chat as
       # Sphynx home). Devices open it at http://sphynx-home/ instead.
@@ -30,8 +30,9 @@ services:
       # Devices connect here when HTTPS is off.
       - "8080:8080"
       # Sphynx home's WireGuard port, for fast direct connections to the
-      # built-in exit node. Forward it on your router too.
-      - "41641:41641/udp"
+      # built-in exit node. Forward it on your router too. (Not 41641: the
+      # Tailscale app uses that when this PC joins as a device itself.)
+      - "41642:41642/udp"
     volumes:
       - sphynx-data:/data
     # Radio mode with a Meshtastic radio plugged in by USB (Linux only):

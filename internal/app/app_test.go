@@ -147,6 +147,32 @@ func TestEffectivePolicy(t *testing.T) {
 	}
 }
 
+func TestEveryDeviceGrants(t *testing.T) {
+	in := PolicyInputs{AdminPort: "3000", HomeIPs: []string{"100.64.0.1", "fd7a:115c:a1e0::1"}, RelayIPs: []string{"100.64.0.9"}}
+	found := map[string]string{}
+	for _, r := range ManagedRules(in) {
+		b, _ := json.Marshal(r.JSON)
+		found[r.Description] = string(b)
+	}
+	admin := found["Every device may open the admin page on Sphynx home."]
+	if !strings.Contains(admin, `"src":["*"]`) || !strings.Contains(admin, `"dst":["100.64.0.1/32","fd7a:115c:a1e0::1/128"]`) || !strings.Contains(admin, `"ip":["tcp:3000"]`) {
+		t.Errorf("admin page grant %q", admin)
+	}
+	relay := found["Every device may use the devices with Peer relay turned on as UDP peer relays."]
+	if !strings.Contains(relay, `"dst":["100.64.0.9/32"]`) || !strings.Contains(relay, `"tailscale.com/cap/relay"`) {
+		t.Errorf("peer relay grant %q", relay)
+	}
+	if _, ok := found["Every device may use Sphynx home as a UDP peer relay."]; ok {
+		t.Error("Sphynx home relay grant while its relay is off")
+	}
+	// Before Sphynx home joins there is nothing to point the grant at.
+	for _, r := range ManagedRules(PolicyInputs{AdminPort: "3000"}) {
+		if strings.Contains(r.Description, "admin page") {
+			t.Error("admin page grant without Sphynx home's addresses")
+		}
+	}
+}
+
 func TestDERPMapYAML(t *testing.T) {
 	y, err := derpMapYAML(fallbackDERPMap)
 	if err != nil {

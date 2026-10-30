@@ -551,11 +551,13 @@ PAGES.overview = async (el) => {
         h("div", null, "Home networks"), h("div", null, (o.home.lanRoutes || []).length ? o.home.lanRoutes.join(", ") : h("span", { class: "faint" }, "none shared")),
         h("div", null, "Peer relay"), h("div", null, o.home.relayPort ? "UDP port " + o.home.relayPort : h("span", { class: "faint" }, "off")))
     : h("p", { class: "muted" }, o.ready ? "Sphynx home is joining the network…" : "Waiting for the control server.");
+  const adminHost = o.magicDns ? "sphynx-home" : (home && ipv4(home)) || "sphynx-home";
   parts.push(h("div", { class: "grid two" },
-    card("Sphynx home", h("span", null, "The device Sphynx runs on your network from this PC. Pick ", h("strong", null, "sphynx-home"), " as exit node on a remote device to use your home internet."),
+    card("Sphynx home", h("span", null, "The device Sphynx itself runs on your network, from the PC that hosts it. Pick ", h("strong", null, "sphynx-home"), " as exit node on a device away from home to use your home internet."),
       homeBody, h("div", { class: "mt" }, h("a", { href: "#/settings" }, "Change in Settings"))),
-    card("Connect a device", "Devices use the official Tailscale app, pointed at this server.",
+    card("Connect a device", "Devices use the official Tailscale app, pointed at this server. Every device gets every feature, like in Tailscale.",
       h("div", { class: "small muted" }, "Server address"), codebox(o.serverUrl),
+      h("div", { class: "small muted" }, "This admin page, from any connected device"), codebox(`http://${adminHost}:${o.adminPort || "3000"}`),
       h("button", { class: "primary", onclick: () => go("add") }, "Step-by-step instructions"))));
 
   const r = o.resilience || {};
@@ -629,6 +631,7 @@ function deviceRow(d) {
   if (d.subnetsAdvertised.some((r) => !d.subnetsApproved.includes(r))) feats.push(badge("Subnet: needs approval", "warn"));
   for (const t of d.tags || []) feats.push(badge(t));
   if (d.strictFirewall) feats.push(badge("443 only"));
+  if (d.peerRelay) feats.push(badge("Peer relay"));
   if (!isZeroTime(d.expiry) && new Date(d.expiry) < new Date()) feats.push(badge("Key expired", "bad"));
   const ip = ipv4(d);
   return h("tr", { class: "clickable", onclick: () => go("device/" + d.id) },
@@ -637,6 +640,31 @@ function deviceRow(d) {
     h("td", { "data-label": "Address", class: "nowrap" }, h("span", { class: "mono" }, ip), ip ? copyButton(ip) : null),
     h("td", { "data-label": "Status" }, statusBadge(d.online, d.lastSeen), linkBadge(d)),
     h("td", { "data-label": "Features" }, feats.length ? feats : h("span", { class: "faint" }, "—")));
+}
+
+// How each kind of device offers itself as an exit node, in the words of
+// Tailscale's apps. Keys are the system names devices report.
+const RUN_EXIT_NODE = {
+  windows: "in the Tailscale icon's menu, choose Exit Node → Run as exit node.",
+  macOS: "in the Tailscale menu bar icon, choose Exit Node → Run Exit Node.",
+  iOS: "in the Tailscale app, open Exit Node and choose Run Exit Node.",
+  tvOS: "in the Tailscale app, open Exit Node and choose Run Exit Node.",
+  android: "in the Tailscale app, tap Exit Node, then Run as exit node. Phones make slow exit nodes, so keep it plugged in.",
+};
+// Tailscale runs peer relays on computers only.
+const NO_PEER_RELAY = ["iOS", "tvOS", "android"];
+
+function runExitNodeHint(os) {
+  if (RUN_EXIT_NODE[os]) return RUN_EXIT_NODE[os];
+  const cmd = h("code", null, "sudo tailscale set --advertise-exit-node");
+  if (os === "linux") return h("span", null, "turn on IP forwarding, then run ", cmd, ".");
+  return h("span", null, "choose “Run exit node” in the Tailscale app, or on Linux run ", cmd, ".");
+}
+
+function shareNetworkHint(os) {
+  if (os === "android") return "in the Tailscale app, open Settings → Subnet routing → Add route.";
+  const cmd = (os === "windows" ? "" : "sudo ") + "tailscale set --advertise-routes=192.168.1.0/24";
+  return h("span", null, "run ", h("code", null, cmd), " on it, with its own network's address.");
 }
 
 PAGES.device = async (el, id) => {
@@ -683,7 +711,7 @@ PAGES.device = async (el, id) => {
         try { await api("POST", `/api/nodes/${d.id}/routes`, { subnets: d.subnetsApproved, exitNode: on }); toast(on ? "Exit node approved" : "Exit node turned off"); reload(); } catch (e) { input.checked = !on; toast(e.message, true); }
       }));
     } else {
-      routeBody.push(h("p", { class: "muted small" }, "To offer this device as an exit node, run ", h("code", null, "tailscale set --advertise-exit-node"), " on it (or pick “Run exit node” in the Tailscale app), then approve it here."));
+      routeBody.push(h("p", { class: "muted small" }, "Any device can be an exit node. To offer this one: ", runExitNodeHint(d.os), " Then approve it here."));
     }
     if (d.subnetsAdvertised.length) {
       routeBody.push(h("h3", { text: "Subnet routes", style: "margin:10px 0 4px" }));
@@ -694,7 +722,7 @@ PAGES.device = async (el, id) => {
         }));
       }
     } else {
-      routeBody.push(h("p", { class: "muted small" }, "No subnet routes advertised. To share this device's local network, run ", h("code", null, "tailscale set --advertise-routes=192.168.1.0/24"), "."));
+      routeBody.push(h("p", { class: "muted small" }, "No subnet routes advertised. To share this device's local network: ", shareNetworkHint(d.os)));
     }
 
     const tagsInput = textInput((d.tags || []).join(", "), { placeholder: "tag:server, tag:nas" });
@@ -717,7 +745,12 @@ PAGES.device = async (el, id) => {
         h("div", { class: "mt" }),
         toggleRow("Strict firewall mode", "Only use HTTPS on port 443, relaying everything. For hotel, office or national firewalls that block or flag anything else. Slower, so leave it off unless needed.", d.strictFirewall, async (on, input) => {
           try { await api("POST", `/api/nodes/${d.id}/options`, { strictFirewall: on }); toast(on ? "Strict firewall mode on" : "Strict firewall mode off"); } catch (e) { input.checked = !on; toast(e.message, true); }
-        }))));
+        }),
+        NO_PEER_RELAY.includes(d.os) ? null : toggleRow("Peer relay",
+          h("span", null, "Let your other devices relay through this one when they can't connect directly, like they can through Sphynx home. Also run ", h("code", null, "tailscale set --relay-server-port=40000"), " on it and let UDP port 40000 in through its firewall, and its router if it's behind one."),
+          d.peerRelay, async (on, input) => {
+            try { await api("POST", `/api/nodes/${d.id}/options`, { peerRelay: on }); toast(on ? "Peer relay on" : "Peer relay off"); } catch (e) { input.checked = !on; toast(e.message, true); }
+          }))));
 
     const wolCard = card("Wake-on-LAN", null);
     if ((d.wolMacs || []).length) {
@@ -1035,22 +1068,32 @@ PAGES.routes = async (el) => {
     }
   }
 
+  const steps = (...items) => h("ul", { class: "small", style: "padding-left:18px;margin:0" }, ...items.map(([who, what]) => h("li", null, h("strong", null, who + ": "), what)));
   el.replaceChildren(
     pageHead("Exit nodes & routes", "Send internet traffic through another device, or reach whole networks behind one."),
     h("div", { class: "grid two" },
       card("Exit nodes", "Approved exit nodes can carry other devices' internet traffic.",
         exitRows.length ? h("ul", { class: "list-plain" }, exitRows) : h("p", { class: "muted" }, "No device offers to be an exit node yet.")),
+      card("Make any device an exit node", "Like in Tailscale, any device can be one. On that device:",
+        steps(
+          ["Windows", "Tailscale icon → Exit Node → Run as exit node."],
+          ["Mac", "Tailscale menu bar icon → Exit Node → Run Exit Node."],
+          ["iPhone, iPad, Apple TV", "Tailscale app → Exit Node → Run Exit Node."],
+          ["Android", "Tailscale app → Exit Node → Run as exit node (slow on phones; keep it plugged in)."],
+          ["Linux", "turn on IP forwarding, then:"]),
+        codebox("sudo tailscale set --advertise-exit-node"),
+        h("p", { class: "small muted mb0" }, "It then appears under Exit nodes: switch it on to approve it."))),
+    h("div", { class: "grid two" },
       card("Use an exit node", "On the device that should use it:",
-        h("ul", { class: "small", style: "padding-left:18px;margin:0" },
-          h("li", null, h("strong", null, "Windows/macOS: "), "Tailscale icon → Exit node → pick ", h("strong", null, "sphynx-home"), " (or “Recommended” for automatic)."),
-          h("li", null, h("strong", null, "iPhone/Android: "), "open Tailscale → Exit node → pick one."),
-          h("li", null, h("strong", null, "Linux: ")),
-        ),
+        steps(
+          ["Windows, Mac", h("span", null, "Tailscale icon → Exit Node → pick a device (", h("strong", null, "sphynx-home"), " is your home internet), or “Recommended” for automatic.")],
+          ["iPhone, iPad, Android", "open Tailscale → Exit Node → pick one."],
+          ["Linux", ""]),
         codebox("tailscale set --exit-node=sphynx-home --exit-node-allow-lan-access"),
         h("p", { class: "small muted" }, "Automatic choice with failover (weak-signal mode):"),
-        codebox("tailscale set --exit-node=auto:any"))),
-    card("Subnet routes", "Networks reachable through a device (for example your home LAN through Sphynx home).",
-      subnetRows.length ? h("ul", { class: "list-plain" }, subnetRows) : h("p", { class: "muted" }, "No device shares a network. Add your home network to Sphynx home in Settings, or run ", h("code", null, "tailscale set --advertise-routes=192.168.1.0/24"), " on a device.")));
+        codebox("tailscale set --exit-node=auto:any")),
+      card("Subnet routes", "Networks reachable through a device (for example your home LAN through Sphynx home). Any device can share its network.",
+        subnetRows.length ? h("ul", { class: "list-plain" }, subnetRows) : h("p", { class: "muted" }, "No device shares a network. Add your home network to Sphynx home in Settings, or run ", h("code", null, "tailscale set --advertise-routes=192.168.1.0/24"), " on a device (Android: Settings → Subnet routing)."))));
 };
 
 // ---------- DNS ----------
@@ -1270,18 +1313,18 @@ PAGES.chat = async (el) => {
     : h("div", null,
       h("div", { class: "inline", style: "margin-bottom:8px" }, h("span", { class: "muted small" }, "Status:"), badge("Waiting for a certificate", "warn")),
       C.secureError ? notice("bad", h("strong", null, "Last try: "), C.secureError) : null,
-      h("p", { class: "small" }, "Sphynx asks Let's Encrypt for a certificate for ", h("span", { class: "mono" }, C.secureHost || "chat.<your domain>"), ". For that, the name must point at the same public IP address as your server, and ports 80 and 443 must be forwarded to this PC. DuckDNS names do this by themselves: chat.myname.duckdns.org already points wherever myname.duckdns.org does."));
+      h("p", { class: "small" }, "Sphynx asks Let's Encrypt for a certificate for ", h("span", { class: "mono" }, C.secureHost || "chat.<your domain>"), ". For that, the name must point at the same public IP address as your server, and ports 80 and 443 must be forwarded to the PC running Sphynx. DuckDNS names do this by themselves: chat.myname.duckdns.org already points wherever myname.duckdns.org does."));
 
   parts.push(h("div", { class: "grid two" },
     card("Open the chat", null,
       h("div", { class: "small muted" }, "On a phone, tablet or computer: connect it to Sphynx with the Tailscale app, then open this in its browser:"),
       codebox(C.addresses[0]),
       C.addresses.length > 1 ? h("div", { class: "small muted" }, "Or: ", ...C.addresses.slice(1).flatMap((a, i) => [i ? ", " : null, h("span", { class: "mono", text: a })])) : null,
-      C.localPort ? h("div", { class: "small muted mt" }, "On this PC (it chats as Sphynx home):") : null,
+      C.localPort ? h("div", { class: "small muted mt" }, "On the PC running Sphynx (it chats as Sphynx home):") : null,
       C.localPort ? codebox(`http://localhost:${C.localPort}/`) : null,
       h("p", { class: "small muted" }, "Each device shows up as its own contact, named like it is on the Devices page. On phones, use the browser's \"Add to Home screen\" to get a chat app icon.")),
     card("Settings", null, enabled,
-      field("Largest file people can send (MB)", maxMb, "Files and photos are kept on this PC until their messages are deleted."))));
+      field("Largest file people can send (MB)", maxMb, "Files and photos are kept on the PC running Sphynx until their messages are deleted."))));
 
   parts.push(card("HTTPS address", "Optional. Over http, chats, photos, files, groups and statuses all work; calls, voice notes, location and notifications need HTTPS.",
     secure, field("HTTPS address (optional)", secureHost, "Leave empty for " + (C.secureHost || "chat.<your server's name>") + "."), httpsStatus));
@@ -1294,7 +1337,7 @@ PAGES.link = async (el) => {
   const L = await api("GET", "/api/link");
   const s = L.settings;
   const enabled = toggleRow("Turn on Sphynx Link", "Run a Tailcat server on Sphynx home.", s.enabled);
-  const exit = checkbox("Use my home internet and network", "Link users get a local proxy that sends their traffic out through this PC.", s.exitNode);
+  const exit = checkbox("Use my home internet and network", "Link users get a local proxy that sends their traffic out through the PC running Sphynx.", s.exitNode);
   const inbox = checkbox("Inbox", "Accept files sent to home. Senders can't see or read anything in the inbox.", s.inbox);
   const admin = checkbox("This admin page", "Open the Sphynx admin page from anywhere (it still asks for your password).", s.admin);
   const derp = textInput(s.derpMapUrl, { placeholder: "default: Tailcat's free relays" });
@@ -1422,7 +1465,7 @@ PAGES.radio = async (el) => {
   // Where chat messages from radio contacts go.
   const people = devices.filter((d) => !d.helper || d.home);
   const deliver = people.map((d) => {
-    const cb = checkbox(devName(d) + (d.home ? " (Sphynx home, this PC)" : ""), null, (s.deliverTo || []).includes(d.id));
+    const cb = checkbox(devName(d) + (d.home ? " (Sphynx home)" : ""), null, (s.deliverTo || []).includes(d.id));
     cb.nodeId = d.id;
     return cb;
   });
@@ -1498,7 +1541,7 @@ PAGES.radio = async (el) => {
   parts.push(h("div", { class: "grid two" },
     card("Radio mode", null, enabled, h("div", { class: "mt" }), linksBox),
     card("What you need", null, h("ol", { class: "steps" },
-      h("li", null, h("strong", null, "A radio at home"), " that this PC can reach: a Meshtastic radio on your Wi-Fi or plugged in by USB, or an APRS radio with a TNC such as Dire Wolf. APRS can also use the internet's APRS-IS network."),
+      h("li", null, h("strong", null, "A radio at home"), " that the PC running Sphynx can reach: a Meshtastic radio on your Wi-Fi or plugged in by USB, or an APRS radio with a TNC such as Dire Wolf. APRS can also use the internet's APRS-IS network."),
       h("li", null, h("strong", null, "A radio with you"), ": a Meshtastic radio paired with the Meshtastic app on your phone, or an APRS radio that sends messages."),
       h("li", null, "Add your radio below as a contact, then send ", h("code", null, "help"), " to Sphynx from it.")))));
 
@@ -1542,14 +1585,14 @@ PAGES.radio = async (el) => {
         : h("div", null, h("p", { class: "muted small" }, "Off: nobody can wake computers over the radio."), h("button", { class: "primary", onclick: (e) => run(e.currentTarget, showCode) }, "Set up wake codes")),
       h("p", { class: "small muted mt" }, R.wakeTargets.length ? "Computers: " + R.wakeTargets.join(", ") + "." : h("span", null, "Add the computers to wake on the ", h("a", { href: "#/wol" }, "Wake-on-LAN"), " page."))),
     card("Commands", "Send these from a radio contact with Commands ticked.", h("div", { class: "kv" },
-      h("div", null, h("code", null, "status")), h("div", null, "Which devices are online, and this PC's internet."),
+      h("div", null, h("code", null, "status")), h("div", null, "Which devices are online, and the home internet."),
       h("div", null, h("code", null, "status <device>")), h("div", null, "One device: online or last seen, and its address."),
       h("div", null, h("code", null, "ping")), h("div", null, "Checks the link and tells you how well Sphynx hears you."),
       h("div", null, h("code", null, "wake <computer> <code>")), h("div", null, "Switches on a computer with Wake-on-LAN."),
       h("div", null, h("code", null, "help")), h("div", null, "The list of commands."),
       h("div", null, h("code", null, "@laptop on my way")), h("div", null, "With Chat ticked: a chat message for one device. Anything that isn't a command goes to Sphynx Chat.")))));
 
-  parts.push(card("Chat messages from radio go to", "A radio contact's messages go to every device that has a chat with it. Until one does, they go to the devices ticked here, or to Sphynx home on this PC (open http://localhost:3001) when none are.",
+  parts.push(card("Chat messages from radio go to", "A radio contact's messages go to every device that has a chat with it. Until one does, they go to the devices ticked here, or to Sphynx home (http://localhost:3001 on the PC running Sphynx) when none are.",
     deliver.length ? h("div", { class: "radio-deliver" }, deliver) : h("p", { class: "muted small" }, "No devices yet.")));
 
   parts.push(card("Log", "The last radio messages, newest first.", logBox));
@@ -1631,7 +1674,7 @@ PAGES.settings = async (el) => {
   const derpV6 = textInput(s.derp.ipv6, { placeholder: "your public IPv6 (optional)" });
 
   const owner = select(users.map((u) => [u.name, userName(u)]), s.owner);
-  const homeExit = toggleRow("Exit node", "Remote devices can use this PC's internet connection, as if they were plugged into your home network.", s.home.exitNode);
+  const homeExit = toggleRow("Exit node", "Your other devices can use your home internet through Sphynx home, as if they were plugged into your home network. Any other device can be an exit node too (see Exit nodes & routes).", s.home.exitNode);
   const homeLAN = listEditor(s.home.lanRoutes, "192.168.1.0/24", 2);
   const relayPort = h("input", { type: "number", min: 0, max: 65535, value: s.home.relayPort || 0 });
   const relayEps = listEditor(s.home.relayEndpoints, "203.0.113.7:40000", 2);
@@ -1695,14 +1738,14 @@ PAGES.settings = async (el) => {
   el.replaceChildren(
     pageHead("Settings", "Changes to the server, HTTPS, relays or sign-in restart the control server for a few seconds. Devices reconnect by themselves.", saveBtn),
     card("Server address", "The address devices use to reach Sphynx. Changing it means existing devices must be pointed at the new address.",
-      field("Server address", serverUrl, h("span", null, "Home only: http://<this PC's IP>:8080. From anywhere: forward the ports on your router to this PC and use HTTPS below. Ports: TCP 8080 (plain) or TCP 443 + 80 (HTTPS), UDP 3478 (relay), UDP ", String(data.ports.homeWireGuard), " (direct connections to Sphynx home)."))),
+      field("Server address", serverUrl, h("span", null, "Home only: http://<the PC's home IP>:8080. From anywhere: forward the ports on your router to the PC running Sphynx and use HTTPS below. Ports: TCP 8080 (plain) or TCP 443 + 80 (HTTPS), UDP 3478 (relay), UDP ", String(data.ports.homeWireGuard), " (direct connections to Sphynx home)."))),
     card("HTTPS", "Encrypts the control connection's outer layer and is needed by phones, the built-in relay and public shares.", field("HTTPS mode", tlsMode), leBox, manBox),
     card("Relays", "Used only when two devices can't connect directly (strict NATs, firewalls, mobile networks).", derpPublic, derpEmbedded, h("div", { class: "row mt" }, field("Public IPv4", derpV4), field("Public IPv6", derpV6))),
     card("Sphynx home", "The device Sphynx itself runs on your network from inside this container.",
       field("Owner", owner, "Sphynx home belongs to this user. Pick yourself."),
       homeExit,
       field("Home networks to share", homeLAN, "Your router's network, e.g. 192.168.1.0/24, so remote devices can reach printers, NAS, cameras… One per line."),
-      h("div", { class: "row" }, field("Peer relay UDP port", relayPort, "0 = off. When set, devices that can't connect directly relay through your home over fast UDP instead of HTTPS relays. Forward this UDP port on your router and in Docker."), field("Relay public address:port", relayEps, "Your public IP and the forwarded port, so devices can find the relay."))),
+      h("div", { class: "row" }, field("Peer relay UDP port", relayPort, "0 = off. When set, devices that can't connect directly relay through your home over fast UDP instead of HTTPS relays. Forward this UDP port on your router and in Docker. Other computers can be peer relays too: see Peer relay on their page under Devices."), field("Relay public address:port", relayEps, "Your public IP and the forwarded port, so devices can find the relay."))),
     card("Weak-signal mode", "For travel in remote areas with patchy cellular, satellite or hotel networks. Applied to every device as Tailscale settings. Make sure devices run a recent Tailscale version.",
       rCache, rReach, rProbe, rAuto, rMTU,
       h("p", { class: "small muted mt mb0" }, "Per-device “strict firewall mode” (HTTPS port 443 only) is on each device's page.")),
