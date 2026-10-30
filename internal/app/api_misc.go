@@ -37,6 +37,7 @@ func (a *App) apiOverview(w http.ResponseWriter, r *http.Request) (any, error) {
 		"owner":      s.Owner,
 		"magicDns":   s.DNS.MagicDNS,
 		"baseDomain": s.DNS.BaseDomain,
+		"adminPort":  a.adminPort(),
 		"headscale":  a.hsProc.Status(),
 		"helpers":    a.helpers.info(),
 		"home":       s.Home,

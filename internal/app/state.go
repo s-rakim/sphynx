@@ -29,6 +29,10 @@ type DeviceOptions struct {
 	// StrictFirewall makes the device only use outbound TCP 443, i.e. relay
 	// everything over HTTPS. For networks that block or flag anything else.
 	StrictFirewall bool `json:"strictFirewall"`
+	// PeerRelay lets the other devices relay through this one when they
+	// can't connect directly. The device itself must also run a relay
+	// (tailscale set --relay-server-port).
+	PeerRelay bool `json:"peerRelay"`
 }
 
 type WakeTarget struct {

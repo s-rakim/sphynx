@@ -72,6 +72,13 @@ type PolicyInputs struct {
 	// it acts as a UDP peer relay.
 	HomeIPs   []string
 	HomeRelay bool
+	// RelayIPs are tailnet addresses of the other devices that may act as
+	// UDP peer relays.
+	RelayIPs []string
+	// AdminPort is the admin page's port on Sphynx home. Like Tailscale's
+	// admin console, it stays reachable from every device whatever the
+	// access rules say; the admin password still protects it.
+	AdminPort string
 	// Chat: devices open Sphynx Chat on Sphynx home (ports 80 and 443).
 	Chat bool
 }
@@ -140,6 +147,17 @@ func ManagedRules(in PolicyInputs) []ManagedRule {
 			},
 		})
 	}
+	if in.AdminPort != "" && len(in.HomeIPs) > 0 {
+		rules = append(rules, ManagedRule{
+			Section:     "grants",
+			Description: "Every device may open the admin page on Sphynx home.",
+			JSON: map[string]any{
+				"src": []string{"*"},
+				"dst": hostPrefixes(in.HomeIPs),
+				"ip":  []string{"tcp:" + in.AdminPort},
+			},
+		})
+	}
 	if in.HomeRelay && len(in.HomeIPs) > 0 {
 		rules = append(rules, ManagedRule{
 			Section:     "grants",
@@ -147,6 +165,17 @@ func ManagedRules(in PolicyInputs) []ManagedRule {
 			JSON: map[string]any{
 				"src": []string{"*"},
 				"dst": hostPrefixes(in.HomeIPs),
+				"app": map[string]any{"tailscale.com/cap/relay": []any{map[string]any{}}},
+			},
+		})
+	}
+	if len(in.RelayIPs) > 0 {
+		rules = append(rules, ManagedRule{
+			Section:     "grants",
+			Description: "Every device may use the devices with Peer relay turned on as UDP peer relays.",
+			JSON: map[string]any{
+				"src": []string{"*"},
+				"dst": hostPrefixes(in.RelayIPs),
 				"app": map[string]any{"tailscale.com/cap/relay": []any{map[string]any{}}},
 			},
 		})

@@ -8,16 +8,23 @@ anyone, no subscription and no device limit.
 
 What you get:
 
+- **Every device gets every feature, like in Tailscale**: open the admin
+  page from any of them, make any of them an exit node (phones too), share
+  a device's local network, relay through any computer, wake computers,
+  chat and send files. The PC running Sphynx is just the server, and it can
+  join as an ordinary device too.
 - **A web admin page** to add devices, see who's online, approve sign-ins,
-  manage users, access rules, DNS, keys and routes. It works on a phone too.
+  manage users, access rules, DNS, keys and routes. Every device opens it at
+  **http://sphynx-home:3000**, and it works on a phone screen.
 - **Every Tailscale feature the open-source server supports**: MagicDNS,
   subnet routers, exit nodes, access rules (ACLs and grants), tags, auth
   keys, Tailscale SSH, Taildrop, Taildrive, single sign-on, peer relays and
   more. [docs/FEATURES.md](docs/FEATURES.md) goes through Tailscale's
   documentation feature by feature.
-- **Sphynx home**: the PC running Sphynx is an exit node out of the box, so
-  any device can use your home internet connection, and it can share your
-  home network (printer, NAS, router page) with your devices.
+- **Sphynx home**: a built-in device inside Sphynx, so your home internet
+  connection is an exit node out of the box, and your home network (printer,
+  NAS, router page) can be shared with your devices without setting up
+  anything else at home.
 - **Wake-on-LAN**: switch on a sleeping or powered-off computer at home from
   anywhere.
 - **Sphynx Chat**: a WhatsApp-style messenger in which every device on your
@@ -44,9 +51,9 @@ unmodified at build time. See [License and credits](#license-and-credits).
 2. [Install Sphynx on your PC](#1-install-sphynx-on-your-pc)
 3. [First start](#2-first-start)
 4. [Make Sphynx reachable from anywhere](#3-make-sphynx-reachable-from-anywhere)
-5. [Connect your devices](#4-connect-your-devices) (Windows, Mac, iPhone and iPad, Android, Linux, Apple TV, NAS and Docker)
-6. [Use your home internet from anywhere (exit node)](#5-use-your-home-internet-from-anywhere-exit-node)
-7. [Reach your home network](#6-reach-your-home-network)
+5. [Connect your devices](#4-connect-your-devices) (Windows, Mac, iPhone and iPad, Android, Linux, Apple TV, NAS and Docker, and the PC itself)
+6. [Exit nodes: use any device's internet](#5-exit-nodes-use-any-devices-internet)
+7. [Reach your home network, or any device's network](#6-reach-your-home-network-or-any-devices-network)
 8. [Wake-on-LAN](#7-wake-on-lan)
 9. [Sphynx Chat](#8-sphynx-chat)
 10. [Weak-signal mode](#9-weak-signal-mode)
@@ -72,6 +79,11 @@ unmodified at build time. See [License and credits](#license-and-credits).
 The control server only introduces devices to each other. Your traffic goes
 directly between devices when it can, or through an encrypted relay when a
 direct path is blocked. The relays never see inside the tunnels.
+
+All devices are equal, as in Tailscale: each one can reach the others, open
+the admin page and use every feature. The PC only hosts the server; Sphynx
+home is a device that lives inside it, so your home internet and home
+network are ready from the start.
 
 ## 1. Install Sphynx on your PC
 
@@ -177,7 +189,7 @@ PC's home network address:
 | 443 | TCP | Devices, the built-in relay, Sphynx Chat over HTTPS, public shares |
 | 80 | TCP | Getting HTTPS certificates from Let's Encrypt |
 | 3478 | UDP | Helps devices find direct paths (STUN) |
-| 41641 | UDP | Fast direct connections to Sphynx home (exit node, home network) |
+| 41642 | UDP | Fast direct connections to Sphynx home (exit node, home network) |
 
 If your router's internet address starts with 100.64 to 100.127, or differs
 from what [whatismyip.com](https://www.whatismyip.com) shows, your provider
@@ -271,8 +283,8 @@ sudo tailscale up --login-server https://myname.duckdns.org
 
 It prints a link: open it in any browser and approve with your admin
 password. To share this machine's internet or network, see
-[exit nodes](#5-use-your-home-internet-from-anywhere-exit-node) and
-[routes](#6-reach-your-home-network).
+[exit nodes](#5-exit-nodes-use-any-devices-internet) and
+[routes](#6-reach-your-home-network-or-any-devices-network).
 
 ### Apple TV
 
@@ -299,33 +311,101 @@ docker run -d --name tailscale --restart unless-stopped \
   tailscale/tailscale
 ```
 
+### The PC that runs Sphynx
+
+The PC can be one of your devices too, with every feature the others have:
+its own chat, Taildrop, remote desktop from your laptop, being an exit node
+for the others, and so on. It then shows up as its own device, next to
+Sphynx home (which is Sphynx itself).
+
+1. Install Tailscale on it as above (Windows or Mac).
+2. In the admin page, open **Add device → With a key** and click
+   **Create key**.
+3. Connect it to Sphynx's address on the PC itself. On Windows, in
+   PowerShell:
+
+   ```
+   tailscale login --login-server http://localhost:8080 --auth-key <the key>
+   ```
+
+   On a Mac, in Terminal:
+
+   ```
+   /Applications/Tailscale.app/Contents/MacOS/Tailscale login --login-server http://localhost:8080 --auth-key <the key>
+   ```
+
+4. In the Tailscale icon's menu, turn off **Use Tailscale subnets**
+   (on Windows it's under **Preferences**), and don't pick an exit node on
+   this PC: both would send Sphynx's own traffic back into your Sphynx
+   network in a circle. Other devices can still use this PC as an exit node.
+
 ### Using your devices
 
 Once connected, devices reach each other by name: `ping laptop`,
 `http://nas:5000`, or `laptop.sphynx.internal` (the full name; the domain is
-set under **DNS**). The admin page itself is at **http://sphynx-home:3000**
-from any of your devices.
+set under **DNS**).
 
-## 5. Use your home internet from anywhere (exit node)
+Every device can do everything, like in Tailscale:
 
-Sphynx home is an exit node from the start: your traffic leaves through your
-home connection, as if you were at home. Useful on public Wi-Fi, or to use
-home-only services while away.
+- **Open the admin page** at **http://sphynx-home:3000** (or
+  **http://100.64.0.1:3000** if "Use Tailscale DNS" is off) and sign in with
+  your admin password. Phones get a phone-sized layout. It stays open to
+  every device even if you tighten the access rules.
+- **Be an exit node** for the others, or use one: see
+  [exit nodes](#5-exit-nodes-use-any-devices-internet).
+- **Share its local network** with the others: see
+  [routes](#6-reach-your-home-network-or-any-devices-network).
+- **Wake a computer** at home, chat in [Sphynx Chat](#8-sphynx-chat), send
+  files with Taildrop and share folders with Taildrive.
+- **Be a peer relay** (computers): see [Everything else](#13-everything-else).
 
-- **Phone**: in the Tailscale app, tap **Exit Node** and pick **sphynx-home**.
-- **Windows and Mac**: Tailscale icon → **Exit nodes** → **sphynx-home**.
-- **Linux**: `sudo tailscale set --exit-node=sphynx-home`.
+## 5. Exit nodes: use any device's internet
+
+An exit node sends a device's internet traffic out through another of your
+devices, as if you were where that device is. Useful on public Wi-Fi, or to
+use home-only services while away. **Sphynx home** is one from the start, so
+your home internet is always there. Like in Tailscale, any of your other
+devices can be one too.
+
+### Use an exit node
+
+- **Phone or tablet**: in the Tailscale app, tap **Exit Node** and pick one,
+  like **sphynx-home** for your home internet.
+- **Windows and Mac**: Tailscale icon → **Exit Node** → pick one.
+- **Linux**: `sudo tailscale set --exit-node=sphynx-home` (or another
+  device's name).
 
 Turn on **Allow local network access** in the same menu if you still want to
-reach the printer at the café or hotel.
+reach the printer at the café or hotel. Weak-signal mode can also pick the
+best exit node by itself.
 
-Any other device can be an exit node too, for example a computer at a
-relative's house: on it, choose "Run as exit node" in the Tailscale menu (on
-Linux `sudo tailscale set --advertise-exit-node`), then approve it under
-**Exit nodes & routes**. Weak-signal mode can also pick the best exit node
-automatically.
+### Make any device an exit node
 
-## 6. Reach your home network
+For example a computer at a relative's house, or an old phone left plugged
+in at a holiday home. On that device:
+
+- **Windows**: Tailscale icon → **Exit Node** → **Run as exit node**.
+- **Mac**: Tailscale icon in the menu bar → **Exit Node** → **Run Exit Node**.
+- **iPhone, iPad and Apple TV**: in the Tailscale app, open **Exit Node** and
+  choose **Run Exit Node**.
+- **Android**: in the Tailscale app, tap **Exit Node** → **Run as exit
+  node**. Phones make slow exit nodes, so keep it plugged in.
+- **Linux**: turn on IP forwarding, then offer it:
+
+  ```
+  echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+  echo 'net.ipv6.conf.all.forwarding = 1' | sudo tee -a /etc/sysctl.d/99-tailscale.conf
+  sudo sysctl -p /etc/sysctl.d/99-tailscale.conf
+  sudo tailscale set --advertise-exit-node
+  ```
+
+Then approve it in the admin page, from any of your devices: open **Exit
+nodes & routes** and switch it on (the Overview shows it under "Waiting for
+approval"). To have exit nodes approved by themselves, add
+`"autoApprovers": {"exitNode": ["you@"]}` under **Access controls**, with your
+user name in place of `you`.
+
+## 6. Reach your home network, or any device's network
 
 To reach devices at home that don't run Tailscale (printer, NAS, cameras, the
 router's own page):
@@ -336,10 +416,23 @@ router's own page):
 2. On Windows, Mac, iPhone and Android, using shared networks is on by
    default. On Linux run `sudo tailscale set --accept-routes`.
 
-Now `http://192.168.1.1` works from your phone anywhere. Other devices can
-share their own networks the same way (Linux:
-`sudo tailscale set --advertise-routes=10.0.0.0/24`), approved under
-**Exit nodes & routes**.
+Now `http://192.168.1.1` works from your phone anywhere.
+
+Like in Tailscale, any other device can share the network it sits on too
+(a subnet router), for example a computer at the office or a holiday home:
+
+- **Windows**, in PowerShell: `tailscale set --advertise-routes=10.0.0.0/24`
+- **Mac**: `sudo tailscale set --advertise-routes=10.0.0.0/24` (on the App
+  Store version, run `/Applications/Tailscale.app/Contents/MacOS/Tailscale`
+  instead of `tailscale`)
+- **Linux**: turn on IP forwarding as for
+  [exit nodes](#5-exit-nodes-use-any-devices-internet), then
+  `sudo tailscale set --advertise-routes=10.0.0.0/24`
+- **Android** (best on an Android TV box): in the Tailscale app,
+  **Settings → Subnet routing → Add route**
+
+Use that network's own address instead of `10.0.0.0/24`, then approve it
+under **Exit nodes & routes**.
 
 ## 7. Wake-on-LAN
 
@@ -354,11 +447,12 @@ Switch on a sleeping or powered-off computer at home from anywhere.
 2. Find its MAC address (on Windows: `ipconfig /all`, "Physical Address" of
    the Ethernet adapter).
 3. In the admin page, open **Wake-on-LAN → Add a computer to wake**: give it a
-   name, enter the MAC address, and pick an always-on device on the same home
-   network to send the wake signal (a Raspberry Pi, NAS or another PC running
-   Tailscale, owned by your user rather than tagged). That's the reliable way
-   with Docker Desktop, which can't broadcast onto your home network itself.
-4. Click **Wake**. You can do this from your phone through
+   name, enter the MAC address, and pick any always-on device on the same
+   home network to send the wake signal (a Raspberry Pi, NAS or another
+   computer running Tailscale, owned by your user rather than tagged).
+   That's the reliable way with Docker Desktop, which can't broadcast onto
+   your home network itself.
+4. Click **Wake**. You can do this from any of your devices, through
    http://sphynx-home:3000.
 
 ## 8. Sphynx Chat
@@ -377,8 +471,11 @@ encrypted in the browser; the server stores only ciphertext.
   **http://sphynx-home/** in its browser (or **http://100.64.0.1/**, if
   "Use Tailscale DNS" is off). On a phone, use the browser's **Add to Home
   Screen** to get an app icon.
-- **On the PC that runs Sphynx**: open **http://localhost:3001**. Sign in to
-  the admin page first; on the PC you chat as Sphynx home.
+- **On the PC that runs Sphynx**: if you connected the PC itself
+  ([The PC that runs Sphynx](#the-pc-that-runs-sphynx)), it's a contact like
+  your other devices: open **http://sphynx-home/**. You can also open
+  **http://localhost:3001** there, after signing in to the admin page, to
+  chat as Sphynx home.
 
 The chat list shows your conversations first, then **Other devices on your
 network**. Tap a device to start chatting. Devices that haven't opened the
@@ -443,6 +540,8 @@ TCP port 443.
 
 **Sphynx home → Peer relay UDP port** makes Sphynx home a fast UDP relay for
 devices that can't reach each other directly (forward that UDP port too).
+Any other computer can be a peer relay as well: see
+[Everything else](#13-everything-else).
 
 ## 10. Sphynx Link
 
@@ -565,13 +664,20 @@ that far. You can turn on both kinds.
 
 - **Devices**: rename, tag, expire, remove; see each device's connection
   (direct, peer relay or relayed) and its exit node and routes.
+- **Peer relays**: like in Tailscale, any Windows, Mac or Linux computer can
+  relay traffic for devices that can't reach each other directly (phones
+  and Apple TV can't). On that computer run
+  `tailscale set --relay-server-port=40000` (with `sudo` on Mac and Linux)
+  and let UDP port 40000 in through its firewall, and its router if it's
+  behind one. Then turn on **Peer relay** on its page under **Devices**.
 - **Users**: add people; each person's devices belong to them. Single sign-on
   with Google, Microsoft, Authentik and others is under **Settings → Single
   sign-on**.
 - **Access controls**: Tailscale's policy file (grants, ACLs, groups, tags,
   auto-approvers, SSH rules, tests). The default lets every device reach
   every other device; Sphynx adds its own rules (shown on the page) for
-  Sphynx home, the chat and weak-signal mode.
+  Sphynx home, the chat, peer relays and weak-signal mode. Whatever you
+  write, every device can still open the admin page.
 - **DNS**: MagicDNS, your own DNS servers (for example a Pi-hole on your
   network for ad blocking everywhere), split DNS, search domains and extra
   DNS records.
@@ -615,20 +721,21 @@ app.
 ## Troubleshooting
 
 - **The admin page doesn't open**: check that Docker Desktop is running and
-  that `docker compose ps` shows `sphynx` as "healthy". It only opens on the PC
-  itself (http://localhost:3000) or, once connected, at
-  http://sphynx-home:3000.
+  that `docker compose ps` shows `sphynx` as "healthy". It opens on the PC
+  itself at http://localhost:3000, and on every connected device at
+  http://sphynx-home:3000 (or http://100.64.0.1:3000).
 - **A device doesn't connect**: check the server address in the app (it must
   match **Settings → Server address** exactly), that `/health` opens from that
   device, and the router's port forwards. iPhones and iPads need an `https://`
   address. Look at **Logs** for the device's attempt.
 - **Connected, but slow**: the Devices page shows "Relayed" when no direct
-  path was found. Forward UDP 41641 and 3478, or set a peer relay port.
+  path was found. Forward UDP 41642 and 3478, or set up a peer relay.
 - **`sphynx-home` doesn't resolve**: turn on **Use Tailscale DNS** in the app
   (Linux: `sudo tailscale set --accept-dns`), or use `100.64.0.1`.
 - **The chat says to connect this device**: open it from a device connected
-  to Sphynx. On the PC itself, use http://localhost:3001 after signing in to
-  the admin page.
+  to Sphynx. On the PC itself, connect the PC as a device
+  ([The PC that runs Sphynx](#the-pc-that-runs-sphynx)), or use
+  http://localhost:3001 after signing in to the admin page.
 - **The chat's HTTPS address isn't ready**: the **Chat** page shows the last
   error. Usually `chat.<your domain>` doesn't point to your home yet, or port
   80 isn't forwarded.
@@ -647,9 +754,10 @@ app.
 
 ## Security notes
 
-- The admin page is only published on the PC itself (`127.0.0.1:3000`) and on
-  your Sphynx network. Use a strong admin password: it also approves new
-  devices.
+- The admin page opens on the PC itself (`127.0.0.1:3000`) and on every
+  device in your Sphynx network, not on the internet. Anyone who knows the
+  admin password can change everything from any of your devices, and the
+  password also approves new devices, so make it a strong one.
 - Device traffic is end-to-end encrypted with WireGuard. The relays, your
   router and your internet provider can't read it.
 - Sphynx Chat messages are encrypted in each browser; the Sphynx server stores

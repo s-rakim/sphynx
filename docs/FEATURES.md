@@ -36,8 +36,8 @@ These aren't in Tailscale; see the [README](../README.md) for each.
 
 | Feature | |
 |---|---|
-| Admin web page | ✅ **tested**. Devices, users, access rules, routes, DNS, keys, logs and settings, also on a phone. |
-| Sphynx home | ✅ **tested**. The PC running Sphynx joins your network as an exit node and can share your home network, with nothing to set up. |
+| Admin web page | ✅ **tested**. Devices, users, access rules, routes, DNS, keys, logs and settings, also on a phone. Every device opens it at `http://sphynx-home:3000`, whatever the access rules say, like Tailscale's admin console. |
+| Sphynx home | ✅ **tested**. A device built into Sphynx: an exit node from the start, and it can share your home network, with nothing else to set up at home. The PC itself can also join as an ordinary device. |
 | Approve devices with your password | ✅ **tested**. A device that signs in without a key opens a Sphynx page where you approve it with the admin password, instead of typing a command on the server. |
 | Wake-on-LAN | ✅ **tested**. Wake a computer at home from anywhere, sent by a device on the same home network. |
 | Sphynx Chat | ✅ **tested**. A WhatsApp-style messenger where every device is its own contact, end-to-end encrypted, with calls on its HTTPS address. |
@@ -118,7 +118,7 @@ These aren't in Tailscale; see the [README](../README.md) for each.
 | Subnet routers | ✅ **tested** | Sphynx home shares your home network (**Settings → Sphynx home**). Any other device can share its networks, approved under **Exit nodes & routes** or automatically with `autoApprovers`. |
 | Site-to-site networking | ✅ | Linux subnet routers with `--snat-subnet-routes=false`, as Tailscale describes. |
 | 4via6 subnet routers | ✅ | The routes are approved like any other route. Not tried in Sphynx's tests. |
-| Exit nodes | ✅ **tested** | Sphynx home is one from the start; any device can be one. |
+| Exit nodes | ✅ **tested** | Sphynx home is one from the start; any device can be one (Windows, Mac, Linux, iPhone, iPad, Android, Apple TV), approved under **Exit nodes & routes** or automatically with `autoApprovers`. Tested with another device as the exit node. |
 | Automatic and suggested exit nodes | ✅ | Turned on by weak-signal mode's **Automatic exit node**. |
 | Mullvad exit nodes | ❌ | A paid add-on sold by Tailscale. Any computer or rented server of your own can be an exit node instead. |
 | App connectors | ❌ | Not supported by Headscale. Use a subnet router for the service's address ranges. |
@@ -128,7 +128,7 @@ These aren't in Tailscale; see the [README](../README.md) for each.
 | High availability | ✅ | Two subnet routers for the same network, or several exit nodes, take over from each other. |
 | Route selection with `via` | ✅ | Grants with `via`. |
 | Regional routing | ❌ | Overlapping routes fail over, but aren't picked by region. |
-| Peer relays | ✅ | **Settings → Sphynx home → Peer relay UDP port** makes Sphynx home a relay; other devices can relay with `tailscale set --relay-server-port` and a grant. |
+| Peer relays | ✅ | **Settings → Sphynx home → Peer relay UDP port** makes Sphynx home a relay. Any Windows, Mac or Linux device can be one too: `tailscale set --relay-server-port=40000` on it, then **Peer relay** on its page under **Devices**. Tested that the other devices are offered the relay; not tested carrying traffic. |
 | DERP relays | 🔁 | Tailscale's free public relays, plus Sphynx's built-in relay (**Settings → Relays**). Other relay servers of your own can't be added in the admin page. |
 
 ## Set up servers

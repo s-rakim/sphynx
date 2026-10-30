@@ -43,6 +43,7 @@ type Device struct {
 	SubnetsAdvertised  []string `json:"subnetsAdvertised"`
 	SubnetsApproved    []string `json:"subnetsApproved"`
 	StrictFirewall     bool     `json:"strictFirewall"`
+	PeerRelay          bool     `json:"peerRelay"`
 }
 
 func isExitRoute(r string) bool { return r == "0.0.0.0/0" || r == "::/0" }
@@ -98,6 +99,7 @@ func (a *App) devices(ctx context.Context) ([]Device, error) {
 		}
 		if o := opts[n.ID]; o != nil {
 			d.StrictFirewall = o.StrictFirewall
+			d.PeerRelay = o.PeerRelay && !d.Helper
 		}
 		for _, ip := range n.IPAddresses {
 			if p := byIP[ip]; p != nil {
@@ -260,9 +262,13 @@ func (a *App) apiNodeExpire(w http.ResponseWriter, r *http.Request) (any, error)
 	return nil, a.hs.ExpireNode(r.Context(), r.PathValue("id"), req.DisableExpiry)
 }
 
-// apiNodeOptions changes Sphynx's per-device options.
+// apiNodeOptions changes Sphynx's per-device options. Options left out of
+// the request keep their value.
 func (a *App) apiNodeOptions(w http.ResponseWriter, r *http.Request) (any, error) {
-	var req DeviceOptions
+	var req struct {
+		StrictFirewall *bool `json:"strictFirewall"`
+		PeerRelay      *bool `json:"peerRelay"`
+	}
 	if err := decode(r, &req); err != nil {
 		return nil, err
 	}
@@ -270,11 +276,23 @@ func (a *App) apiNodeOptions(w http.ResponseWriter, r *http.Request) (any, error
 	if _, err := a.hs.GetNode(r.Context(), id); err != nil {
 		return nil, err
 	}
+	if req.PeerRelay != nil && *req.PeerRelay && a.helpers.helperNodeIDs()[id] {
+		return nil, badRequest("this is one of Sphynx's own devices; Sphynx home's peer relay is under Settings")
+	}
 	if err := a.state.Update(func(s *State) error {
 		if s.Devices == nil {
 			s.Devices = map[string]*DeviceOptions{}
 		}
-		o := req
+		var o DeviceOptions
+		if cur := s.Devices[id]; cur != nil {
+			o = *cur
+		}
+		if req.StrictFirewall != nil {
+			o.StrictFirewall = *req.StrictFirewall
+		}
+		if req.PeerRelay != nil {
+			o.PeerRelay = *req.PeerRelay
+		}
 		s.Devices[id] = &o
 		return nil
 	}); err != nil {

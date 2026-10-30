@@ -43,8 +43,9 @@ ENV SPHYNX_DATA=/data ZONEINFO=/usr/local/share/zoneinfo.zip \
 VOLUME /data
 # 3000 admin UI, 3001 Sphynx Chat for this PC, 8080 devices over plain
 # HTTP, 80/443 devices over HTTPS, 3478/udp STUN for the built-in relay,
-# 41641/udp Sphynx home WireGuard.
-EXPOSE 3000/tcp 3001/tcp 8080/tcp 80/tcp 443/tcp 3478/udp 41641/udp
+# 41642/udp Sphynx home WireGuard (41641 is left to the Tailscale app, so
+# the PC can join the network as a device of its own too).
+EXPOSE 3000/tcp 3001/tcp 8080/tcp 80/tcp 443/tcp 3478/udp 41642/udp
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s \
   CMD wget -q -O /dev/null http://127.0.0.1:3000/api/session || exit 1
 ENTRYPOINT ["/usr/local/bin/sphynx"]
