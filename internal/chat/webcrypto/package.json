@@ -1,0 +1,18 @@
+{
+  "name": "sphynx-chat-webcrypto-fallback",
+  "private": true,
+  "description": "Builds ../web/vendor/webcrypto-fallback.js: WebCrypto for Sphynx Chat pages opened over plain http",
+  "type": "module",
+  "license": "BSD-3-Clause",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,0 +1,10 @@
+.git
+.github
+.env
+dist
+*.md
+!THIRD_PARTY_NOTICES.md
+docs
+**/node_modules
+internal/chat/test
+internal/chat/webcrypto

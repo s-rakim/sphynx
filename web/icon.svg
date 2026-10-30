@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sphynx">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7b6cff"/>
+      <stop offset="1" stop-color="#4b33d6"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#g)"/>
+  <path d="M14 13 L26 24 Q32 22 38 24 L50 13 Q53 28 50 37 Q47 50 32 52 Q17 50 14 37 Q11 28 14 13 Z" fill="#fff"/>
+  <path d="M21 34 Q25 30.5 29 34 Q25 37 21 34 Z" fill="#4b33d6"/>
+  <path d="M35 34 Q39 30.5 43 34 Q39 37 35 34 Z" fill="#4b33d6"/>
+  <path d="M30 41 L34 41 L32 43.5 Z" fill="#4b33d6"/>
+  <path d="M18 18.5 L24 24" stroke="#c9c2ff" stroke-width="2" stroke-linecap="round"/>
+  <path d="M46 18.5 L40 24" stroke="#c9c2ff" stroke-width="2" stroke-linecap="round"/>
+</svg>
